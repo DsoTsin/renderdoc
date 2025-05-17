@@ -31,6 +31,8 @@
 #include "common/result.h"
 #include "streamio.h"
 
+struct NVDX_ObjectHandle__;
+
 // function to deallocate anything from a serialise. Default impl
 // does no deallocation of anything.
 template <class T>
@@ -1765,6 +1767,7 @@ inline rdcliteral TypeName<rdcinflexiblestr>()
 {
   return "string"_lit;
 }
+
 template <class SerialiserType>
 void DoSerialise(SerialiserType &ser, rdcinflexiblestr &el)
 {

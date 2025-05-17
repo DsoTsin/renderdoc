@@ -59,7 +59,7 @@ rdcstr DoStringise(const D3D11ResourceType &el)
 template <>
 rdcstr DoStringise(const D3D11Chunk &el)
 {
-  RDCCOMPILE_ASSERT((uint32_t)D3D11Chunk::Max == 1131, "Chunks changed without updating names");
+  RDCCOMPILE_ASSERT((uint32_t)D3D11Chunk::Max == 1139, "Chunks changed without updating names");
 
   BEGIN_ENUM_STRINGISE(D3D11Chunk)
   {
@@ -213,6 +213,16 @@ rdcstr DoStringise(const D3D11Chunk &el)
     STRINGISE_ENUM_CLASS_NAMED(OpenSharedResource1, "ID3D11Device1::OpenSharedResource1");
     STRINGISE_ENUM_CLASS_NAMED(OpenSharedResourceByName, "ID3D11Device1::OpenSharedResourceByName");
     STRINGISE_ENUM_CLASS_NAMED(SetShaderExtUAV, "VendorExtension::SetExtensionUAVSlot");
+
+    STRINGISE_ENUM_CLASS_NAMED(NvApi_CreateCubinShader, "Nv::CreateCubinShader");
+    STRINGISE_ENUM_CLASS_NAMED(NvApi_LaunchCubinShader, "Nv::LaunchCubinShader");
+    STRINGISE_ENUM_CLASS_NAMED(NvApi_DestroyCubinShader, "Nv::DestroyCubinShader");
+    STRINGISE_ENUM_CLASS_NAMED(NvApi_CreateSamplerState, "Nv::CreateSamplerState");
+    STRINGISE_ENUM_CLASS_NAMED(NvApi_CreateSRV, "Nv::CreateShaderResourceView");
+    STRINGISE_ENUM_CLASS_NAMED(NvApi_CreateUAV, "Nv::CreateUnorderedAccessView");
+    STRINGISE_ENUM_CLASS_NAMED(NvApi_GetCudaTextureObject, "Nv::GetCudaTextureObject");
+    STRINGISE_ENUM_CLASS_NAMED(NvApi_GetResourceHandle, "Nv::GetResourceHandle");
+
     STRINGISE_ENUM_CLASS_NAMED(Max, "Max Chunk");
   }
   END_ENUM_STRINGISE()

@@ -30,6 +30,8 @@
 #include "d3d11_debug.h"
 #include "d3d11_renderstate.h"
 #include "d3d11_resources.h"
+#include "d3d11_common.h"
+#include "../ihv/nv/official/nvapi/nvapi.h"
 
 #ifndef DXGI_ERROR_INVALID_CALL
 #define DXGI_ERROR_INVALID_CALL MAKE_DXGI_HRESULT(1)
@@ -5106,6 +5108,104 @@ void WrappedID3D11DeviceContext::Dispatch(UINT ThreadGroupCountX, UINT ThreadGro
     m_ContextRecord->AddChunk(scope.Get());
 
     m_CurrentPipelineState->MarkReferenced(this, false);
+  }
+}
+
+template <typename SerialiserType>
+bool WrappedID3D11DeviceContext::Serialise_LaunchCubinShader(
+    SerialiserType &ser, 
+    NVDX_ObjectHandle__ *hShader, UINT gridX, UINT gridY, UINT gridZ, const void *pParams,
+    UINT paramSize, const NVDX_ObjectHandle__ **pReadResources, UINT numReadResources,
+    const NVDX_ObjectHandle__ **pWriteResources, UINT numWriteResources)
+{
+  SERIALISE_ELEMENT(hShader).Important();
+  SERIALISE_ELEMENT(gridX).Important();
+  SERIALISE_ELEMENT(gridY).Important();
+  SERIALISE_ELEMENT(gridZ).Important();
+  SERIALISE_ELEMENT_ARRAY(pParams, (size_t)paramSize); // todo: unwrap params
+  SERIALISE_ELEMENT_LOCAL(paramSize_, (uint32_t)paramSize);
+  SERIALISE_ELEMENT_ARRAY(pReadResources, numReadResources);
+  SERIALISE_ELEMENT_LOCAL(numReadResources_, (uint32_t)numReadResources);
+  SERIALISE_ELEMENT_ARRAY(pWriteResources, numWriteResources);
+  SERIALISE_ELEMENT_LOCAL(numWriteResources_, (uint32_t)numWriteResources);
+
+  Serialise_DebugMessages(GET_SERIALISER);
+
+  SERIALISE_CHECK_READ_ERRORS();
+
+  if(IsReplayingAndReading())
+  {
+    WrappedCubinShader *cubinShader = (WrappedCubinShader *)hShader;
+    NvAPI_D3D11_LaunchCubinShader(m_pRealContext, cubinShader->real(), gridX, gridY, gridZ, pParams,
+                                  paramSize,
+                                  (const NVDX_ObjectHandle *)pReadResources, numReadResources,
+                                  (const NVDX_ObjectHandle *)pWriteResources, numWriteResources);
+
+    //MarkResourceReferenced(cubinShader->GetResourceID(), eFrameRef_Read);
+
+    if(IsLoading(m_State))
+    {
+      RecordDispatchStats(false);
+
+      AddEvent();
+
+      ActionDescription action;
+      action.flags |= ActionFlags::Dispatch;
+
+      action.dispatchDimension[0] = gridX;
+      action.dispatchDimension[1] = gridY;
+      action.dispatchDimension[2] = gridZ;
+
+      if(gridX == 0)
+        m_pDevice->AddDebugMessage(
+            MessageCategory::Execution, MessageSeverity::Medium, MessageSource::IncorrectAPIUse,
+            "Dispatch call has ThreadGroup count X=0. This will do nothing, "
+            "which is unusual for a non-indirect Dispatch. Did you mean X=1?");
+      if(gridY == 0)
+        m_pDevice->AddDebugMessage(
+            MessageCategory::Execution, MessageSeverity::Medium, MessageSource::IncorrectAPIUse,
+            "Dispatch call has ThreadGroup count Y=0. This will do nothing, "
+            "which is unusual for a non-indirect Dispatch. Did you mean Y=1?");
+      if(gridZ == 0)
+        m_pDevice->AddDebugMessage(
+            MessageCategory::Execution, MessageSeverity::Medium, MessageSource::IncorrectAPIUse,
+            "Dispatch call has ThreadGroup count Z=0. This will do nothing, "
+            "which is unusual for a non-indirect Dispatch. Did you mean Z=1?");
+
+      AddAction(action);
+    }
+  }
+  return true;
+}
+
+void WrappedID3D11DeviceContext::LaunchCubinShader(
+    NVDX_ObjectHandle__ *hShader, UINT gridX, UINT gridY, UINT gridZ, 
+    const void *pParams, UINT paramSize, 
+    const NVDX_ObjectHandle__* *pReadResources, UINT numReadResources,
+    const NVDX_ObjectHandle__ **pWriteResources, UINT numWriteResources)
+{
+  SCOPED_LOCK_OPTIONAL(m_pDevice->D3DLock(), m_pDevice->D3DThreadSafe());
+
+  DrainAnnotationQueue();
+
+  MarkAPIActive();
+
+  m_EmptyCommandList = false;
+
+  //SERIALISE_TIME_CALL(
+  //    m_pRealContext->Dispatch(ThreadGroupCountX, ThreadGroupCountY, ThreadGroupCountZ));
+
+  if(IsActiveCapturing(m_State))
+  {
+    USE_SCRATCH_SERIALISER();
+    GET_SERIALISER.SetActionChunk();
+    SCOPED_SERIALISE_CHUNK(D3D11Chunk::NvApi_LaunchCubinShader);
+    SERIALISE_ELEMENT(m_ResourceID).Named("Context"_lit).TypedAs("ID3D11DeviceContext *"_lit);
+    Serialise_LaunchCubinShader(GET_SERIALISER, hShader, gridX, gridY, gridZ, pParams, paramSize,
+                                pReadResources, numReadResources, pWriteResources, numWriteResources);
+
+    m_ContextRecord->AddChunk(scope.Get());
+    MarkResourceReferenced(GetIDForNVDXObjectHandle(hShader), eFrameRef_Read);
   }
 }
 

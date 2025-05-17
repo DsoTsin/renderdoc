@@ -27,6 +27,8 @@
 #include "d3d11_context.h"
 #include "d3d11_debug.h"
 #include "d3d11_resources.h"
+#include "../ihv/nv/official/nvapi/nvapi.h"
+
 
 void WrappedID3D11Device::MaskResourceMiscFlags(UINT &MiscFlags)
 {
@@ -4096,6 +4098,200 @@ bool WrappedID3D11Device::Serialise_SetExceptionMode(SerialiserType &ser, UINT R
   return true;
 }
 
+template <typename SerialiserType>
+bool WrappedID3D11Device::Serialise_CreateCubinComputeShader(SerialiserType &ser,
+                                                             const void *pCubin, uint32_t size,
+                                                             uint32_t blockX, uint32_t blockY, uint32_t blockZ,
+                                                             const char *pName,
+                                                             NVDX_ObjectHandle__* *phShader)
+{
+  SCOPED_LOCK(m_D3DLock);
+  SERIALISE_ELEMENT_ARRAY(pCubin, size);
+  SERIALISE_ELEMENT_LOCAL(size_, (uint64_t)size);
+  SERIALISE_ELEMENT(blockX).Important();
+  SERIALISE_ELEMENT(blockY).Important();
+  SERIALISE_ELEMENT(blockZ).Important();  
+  SERIALISE_ELEMENT(pName);
+  SERIALISE_ELEMENT_LOCAL(pShader, GetIDForNVDXObjectHandle(*phShader))
+      .TypedAs("CubinShader *"_lit);
+
+  if(IsReplayingAndReading())
+  {
+    NVDX_ObjectHandle cubinShader;
+    NvAPI_D3D11_CreateCubinComputeShaderWithName(m_pDevice, pCubin, (NvU32)size_, blockX, blockY, blockZ,
+                                                 pName, &cubinShader);
+
+    auto wrapped = new WrappedCubinShader(cubinShader, pShader, (const byte *)pCubin,
+                                          (size_t)size_, pName, blockX, blockY, blockZ, this);
+    GetResourceManager()->AddLiveVendorResource(wrapped->GetResourceID(), wrapped);
+    //AddResource(wrapped->GetResourceID(), ResourceType::Shader, "Compute Shader");
+    AddResource(wrapped->GetResourceID(), ResourceType::CubinShader, pName ? pName : "Cuda Binary",
+                false);
+  }
+  return true;
+}
+
+_NvAPI_Status WrappedID3D11Device::CreateCubinComputeShader(const void *pCubin, uint32_t size,
+                                                            uint32_t blockX, uint32_t blockY, uint32_t blockZ, 
+                                                            const char *pName,
+                                                            NVDX_ObjectHandle__* *phShader)
+{
+  SCOPED_LOCK(m_D3DLock);
+  auto wrapped = new WrappedCubinShader(*phShader, ResourceId(), (const byte *)pCubin, (size_t)size,
+                                        pName, blockX, blockY, blockZ, this); 
+  if(IsCaptureMode(m_State))
+  {
+    USE_SCRATCH_SERIALISER();
+    SCOPED_SERIALISE_CHUNK(D3D11Chunk::NvApi_CreateCubinShader);
+    Serialise_CreateCubinComputeShader(ser, pCubin, size, blockX, blockY, blockZ, pName,
+                                       (NVDX_ObjectHandle__ **)&wrapped);
+    m_DeviceRecord->AddChunk(scope.Get());
+
+    ResourceId id = wrapped->GetResourceID();
+    RDCASSERT(GetResourceManager()->GetResourceRecord(id) == NULL);
+    D3D11ResourceRecord *record = GetResourceManager()->AddResourceRecord(id);
+    record->Length = 0;
+    record->AddChunk(scope.Get());
+  }
+  else
+  {
+    GetResourceManager()->AddLiveVendorResource(wrapped->GetResourceID(), wrapped); 
+  }
+  if(phShader && *phShader)
+  {
+    *phShader = (NVDX_ObjectHandle__ *)wrapped;
+  }
+  return NVAPI_OK;
+}
+
+template <typename SerialiserType>
+bool WrappedID3D11Device::Serialise_DestroyCubinComputeShader(SerialiserType &ser,
+                                                             NVDX_ObjectHandle__ *hShader)
+{
+  SCOPED_LOCK(m_D3DLock);
+  SERIALISE_ELEMENT(hShader).Important();
+  if(IsReplayingAndReading())
+  {
+    WrappedCubinShader *cubinShader = (WrappedCubinShader *)hShader;
+    NvAPI_D3D11_DestroyCubinComputeShader(m_pDevice, cubinShader->real());
+  }
+  return true;
+}
+
+_NvAPI_Status WrappedID3D11Device::DestroyCubinComputeShader(NVDX_ObjectHandle__ *hShader)
+{
+  if(IsCaptureMode(m_State))
+  {
+    USE_SCRATCH_SERIALISER();
+    SCOPED_SERIALISE_CHUNK(D3D11Chunk::NvApi_DestroyCubinShader);
+    Serialise_DestroyCubinComputeShader(ser, hShader);
+    m_DeviceRecord->AddChunk(scope.Get());
+  }
+
+  if(hShader)
+  {
+    SCOPED_LOCK(m_D3DLock);
+    WrappedCubinShader *wrapped = (WrappedCubinShader *)hShader;
+    delete wrapped;
+  }
+  return NVAPI_OK;
+}
+
+template <typename SerialiserType>
+bool WrappedID3D11Device::Serialise_NvCreateSamplerState(SerialiserType &ser,
+                                                         const D3D11_SAMPLER_DESC *pSamplerDesc,
+                                                         ID3D11SamplerState **ppSamplerState,
+                                                         uint32_t *pDriverHandle)
+{
+  SERIALISE_ELEMENT_LOCAL(Descriptor, *pSamplerDesc).Important();
+  SERIALISE_ELEMENT_LOCAL(pState, GetIDForDeviceChild(*ppSamplerState))
+      .TypedAs("ID3D11SamplerState *"_lit);
+  if(ser.IsWriting())
+  {
+  }
+  SERIALISE_CHECK_READ_ERRORS();
+  if(IsReplayingAndReading())
+  {
+  }
+  return true;
+}
+
+_NvAPI_Status WrappedID3D11Device::NvCreateSamplerState(const D3D11_SAMPLER_DESC *pSamplerDesc,
+                                                        ID3D11SamplerState **ppSamplerState,
+                                                        uint32_t *pDriverHandle)
+{
+  if(IsCaptureMode(m_State))
+  {
+    USE_SCRATCH_SERIALISER();
+    SCOPED_SERIALISE_CHUNK(D3D11Chunk::NvApi_CreateSamplerState);
+    Serialise_NvCreateSamplerState(ser, pSamplerDesc, ppSamplerState, pDriverHandle);
+    m_DeviceRecord->AddChunk(scope.Get());
+  }
+  return NVAPI_OK;
+}
+
+template <typename SerialiserType>
+bool WrappedID3D11Device::Serialise_NvCreateShaderResourceView(
+    SerialiserType &ser,
+    ID3D11Resource *pResource, const D3D11_SHADER_RESOURCE_VIEW_DESC *pDesc,
+    ID3D11ShaderResourceView **ppSRV, uint32_t *pDriverHandle)
+{
+  SERIALISE_ELEMENT(pResource).Important();
+  SERIALISE_ELEMENT_OPT(pDesc).Important();
+  SERIALISE_ELEMENT_LOCAL(pView, GetIDForDeviceChild(*ppSRV))
+      .TypedAs("ID3D11ShaderResourceView *"_lit);
+  if(ser.IsWriting())
+  {
+  }
+
+  SERIALISE_CHECK_READ_ERRORS();
+  return true;
+}
+
+_NvAPI_Status WrappedID3D11Device::NvCreateShaderResourceView(ID3D11Resource* pResource,
+    const D3D11_SHADER_RESOURCE_VIEW_DESC* pDesc,
+    ID3D11ShaderResourceView** ppSRV, uint32_t* pDriverHandle)
+{
+  if(IsCaptureMode(m_State))
+  {
+    USE_SCRATCH_SERIALISER();
+    SCOPED_SERIALISE_CHUNK(D3D11Chunk::NvApi_CreateSRV);
+    Serialise_NvCreateShaderResourceView(ser, pResource, pDesc, ppSRV, pDriverHandle);
+    m_DeviceRecord->AddChunk(scope.Get());
+  }
+  return NVAPI_OK;
+}
+
+template <typename SerialiserType>
+bool WrappedID3D11Device::Serialise_NvCreateUnorderedAccessView(
+    SerialiserType &ser, ID3D11Resource *pResource, const D3D11_UNORDERED_ACCESS_VIEW_DESC *pDesc,
+    ID3D11UnorderedAccessView **ppUAV, uint32_t *pDriverHandle)
+{
+  SERIALISE_ELEMENT(pResource).Important();
+  SERIALISE_ELEMENT_OPT(pDesc).Important();
+  SERIALISE_ELEMENT_LOCAL(pUAV, GetIDForDeviceChild(*ppUAV))
+      .TypedAs("ID3D11ShaderResourceView *"_lit);
+  if(ser.IsWriting())
+  {
+  }
+
+  return true;
+}
+
+_NvAPI_Status WrappedID3D11Device::NvCreateUnorderedAccessView(ID3D11Resource* pResource,
+    const D3D11_UNORDERED_ACCESS_VIEW_DESC* pDesc,
+    ID3D11UnorderedAccessView** ppUAV, uint32_t* pDriverHandle)
+{
+  if(IsCaptureMode(m_State))
+  {
+    USE_SCRATCH_SERIALISER();
+    SCOPED_SERIALISE_CHUNK(D3D11Chunk::NvApi_CreateUAV);
+    Serialise_NvCreateUnorderedAccessView(ser, pResource, pDesc, ppUAV, pDriverHandle);
+    m_DeviceRecord->AddChunk(scope.Get());
+  }
+  return NVAPI_OK;
+}
+
 HRESULT WrappedID3D11Device::SetExceptionMode(UINT RaiseFlags)
 {
   HRESULT ret;
@@ -4127,3 +4323,4 @@ UINT WrappedID3D11Device::GetExceptionMode()
 
 SERIALISED_ID3D11DEVICE_FUNCTIONS();
 SERIALISED_ID3D11DEVICE_FAKE_FUNCTIONS();
+SERIALISED_ID3D11NVAPI_FUNCTIONS();

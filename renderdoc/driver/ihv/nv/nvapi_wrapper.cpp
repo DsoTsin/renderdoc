@@ -154,9 +154,16 @@ private:
 
 #define NVAPI_FUNC(func) decltype(&::func) func = NULL;
 
-#define NVAPI_FUNCS()                               \
-  NVAPI_FUNC(NvAPI_D3D11_SetNvShaderExtnSlot);      \
-  NVAPI_FUNC(NvAPI_D3D12_SetNvShaderExtnSlotSpace); \
+#define NVAPI_FUNCS()                                \
+  NVAPI_FUNC(NvAPI_D3D11_SetNvShaderExtnSlot);       \
+  NVAPI_FUNC(NvAPI_D3D11_LaunchCubinShader);         \
+  NVAPI_FUNC(NvAPI_D3D11_DestroyCubinComputeShader); \
+  NVAPI_FUNC(NvAPI_D3D11_CreateCubinComputeShader);  \
+  NVAPI_FUNC(NvAPI_D3D11_CreateSamplerState);        \
+  NVAPI_FUNC(NvAPI_D3D11_GetCudaTextureObject);      \
+  NVAPI_FUNC(NvAPI_D3D11_CreateShaderResourceView);  \
+  NVAPI_FUNC(NvAPI_D3D11_GetResourceHandle);         \
+  NVAPI_FUNC(NvAPI_D3D12_SetNvShaderExtnSlotSpace);  \
   NVAPI_FUNC(NvAPI_GetInterfaceVersionString);
 
   NVAPI_FUNCS()

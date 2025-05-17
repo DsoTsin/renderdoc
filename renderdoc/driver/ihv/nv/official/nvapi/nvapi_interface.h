@@ -90,6 +90,7 @@ struct NVAPI_INTERFACE_TABLE nvapi_interface_table[] =
     { "NvAPI_GPU_GetArchInfo", 0xd8265d24 },
     { "NvAPI_I2CRead", 0x2fde12c5 },
     { "NvAPI_I2CWrite", 0xe812eb07 },
+    { "NvAPI_GPU_GetUsages", 0x189a1fdf },
     { "NvAPI_GPU_WorkstationFeatureSetup", 0x6c1f3fe4 },
     { "NvAPI_GPU_WorkstationFeatureQuery", 0x004537df },
     { "NvAPI_GPU_GetHDCPSupportStatus", 0xf089eef5 },

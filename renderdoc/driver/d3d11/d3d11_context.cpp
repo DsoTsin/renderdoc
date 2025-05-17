@@ -902,6 +902,9 @@ bool WrappedID3D11DeviceContext::ProcessChunk(ReadSerialiser &ser, D3D11Chunk ch
     case D3D11Chunk::DiscardView: ret = Serialise_DiscardView(ser, NULL); break;
     case D3D11Chunk::DiscardView1: ret = Serialise_DiscardView1(ser, NULL, NULL, 0); break;
 
+    case D3D11Chunk::NvApi_LaunchCubinShader:
+      ret = Serialise_LaunchCubinShader(ser, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+      break;
     case D3D11Chunk::PostExecuteCommandList:
       ret = Serialise_PostExecuteCommandList(ser, NULL, FALSE);
       break;
@@ -965,6 +968,15 @@ bool WrappedID3D11DeviceContext::ProcessChunk(ReadSerialiser &ser, D3D11Chunk ch
     case D3D11Chunk::OpenSharedResourceByName:
     case D3D11Chunk::SetShaderDebugPath:
     case D3D11Chunk::SetShaderExtUAV:
+
+    // dlss related api
+    case D3D11Chunk::NvApi_CreateCubinShader:
+    case D3D11Chunk::NvApi_DestroyCubinShader:
+    case D3D11Chunk::NvApi_CreateSamplerState:
+    case D3D11Chunk::NvApi_CreateSRV:
+    case D3D11Chunk::NvApi_CreateUAV:
+    case D3D11Chunk::NvApi_GetCudaTextureObject:
+    case D3D11Chunk::NvApi_GetResourceHandle:
       RDCERR("Unexpected chunk while processing frame: %s", ToStr(chunk).c_str());
       return false;
 

@@ -27,6 +27,21 @@
 #include <stdint.h>
 #include <windows.h>
 
+enum _NvAPI_Status;
+struct NVDX_ObjectHandle__;
+struct D3D11_SAMPLER_DESC;
+struct D3D11_SHADER_RESOURCE_VIEW_DESC;
+struct D3D11_UNORDERED_ACCESS_VIEW_DESC;
+struct ID3D11Resource;
+struct ID3D11ShaderResourceView;
+struct ID3D11UnorderedAccessView;
+struct ID3D11SamplerState;
+
+static const GUID NVAPI_RESOURCE_DDI_HANDLE = {0xdf027733,
+                                               0x2812,
+                                               0x4b38,
+                                               {0x89, 0x3a, 0x76, 0x09, 0x12, 0xdd, 0xbe, 0x55}};
+
 enum class NvShaderOpcode : uint32_t
 {
   Unknown = 0,
@@ -92,6 +107,51 @@ INVAPID3DDevice : public IUnknown
   virtual ID3D12PipelineState *STDMETHODCALLTYPE ProcessCreatedComputePipelineState(
       const D3D12_COMPUTE_PIPELINE_STATE_DESC *pDesc, uint32_t reg, uint32_t space,
       ID3D12PipelineState *realPSO) = 0;
+
+  virtual _NvAPI_Status STDMETHODCALLTYPE D3D11_CreateCubinComputeShader(
+      const void *pCubin, uint32_t size, uint32_t blockX, uint32_t blockY, uint32_t blockZ, const char* pName,
+      NVDX_ObjectHandle__* *phShader)
+  {
+    return (_NvAPI_Status)-3;
+  }
+
+  virtual _NvAPI_Status STDMETHODCALLTYPE D3D11_DestroyCubinComputeShader(NVDX_ObjectHandle__* hShader)
+  {
+    return (_NvAPI_Status)-3;
+  }
+
+  virtual _NvAPI_Status STDMETHODCALLTYPE D3D11_CreateSamplerState(
+      const D3D11_SAMPLER_DESC *pSamplerDesc, ID3D11SamplerState **ppSamplerState,
+      uint32_t *pDriverHandle)
+  {
+    return (_NvAPI_Status)-3;
+  }
+
+  virtual _NvAPI_Status STDMETHODCALLTYPE D3D11_CreateShaderResourceView(
+      ID3D11Resource * pResource, const D3D11_SHADER_RESOURCE_VIEW_DESC *pDesc,
+      ID3D11ShaderResourceView **ppSRV, uint32_t *pDriverHandle)
+  {
+    return (_NvAPI_Status)-3;
+  }
+
+  virtual _NvAPI_Status STDMETHODCALLTYPE D3D11_CreateUnorderedAccessView(
+      ID3D11Resource * pResource, __in const D3D11_UNORDERED_ACCESS_VIEW_DESC *pDesc,
+      ID3D11UnorderedAccessView **ppUAV, uint32_t *pDriverHandle)
+  {
+    return (_NvAPI_Status)-3;
+  }
+
+  virtual _NvAPI_Status STDMETHODCALLTYPE D3D11_GetResourceHandle(
+      ID3D11Resource * pResource, NVDX_ObjectHandle__* * phObject)
+  {
+    return (_NvAPI_Status)-3;
+  }
+
+  virtual _NvAPI_Status STDMETHODCALLTYPE D3D11_GetCudaTextureObject(
+      uint32_t srvDriverHandle, uint32_t samplerDriverHandle, uint32_t *pCudaTextureHandle)
+  {
+    return (_NvAPI_Status)-3;
+  }
 };
 
 INVAPID3DDevice *InitialiseNVAPIReplay();

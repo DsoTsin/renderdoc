@@ -27,6 +27,7 @@
 #include "d3d11_common.h"
 #include "d3d11_manager.h"
 #include "d3d11_resources.h"
+#include "../ihv/nv/official/nvapi/nvapi.h"
 
 // serialisation of object handles via IDs.
 template <class SerialiserType, class Interface>
@@ -50,6 +51,48 @@ void DoSerialiseViaResourceId(SerialiserType &ser, Interface *&el)
   }
 }
 
+template <class SerialiserType>
+void DoSerialiseNVDXObjectHandleViaResourceId(SerialiserType &ser, NVDX_ObjectHandle__ *&el)
+{
+  D3D11ResourceManager *rm = (D3D11ResourceManager *)ser.GetUserData();
+
+  ResourceId id;
+
+  if(ser.IsWriting() && rm)
+    id = GetIDForNVDXObjectHandle(el);
+
+  DoSerialise(ser, id);
+
+  if(ser.IsReading())
+  {
+    if(id != ResourceId() && rm && rm->HasLiveResource(id))
+      el = (NVDX_ObjectHandle__ *)rm->GetLiveVendorResource(id);
+    else
+      el = NULL;
+  }
+}
+
+template <class SerialiserType>
+void DoSerialiseNVDXObjectHandleViaResourceId(SerialiserType &ser, NVDX_ObjectHandle__ const*&el)
+{
+  D3D11ResourceManager *rm = (D3D11ResourceManager *)ser.GetUserData();
+
+  ResourceId id;
+
+  if(ser.IsWriting() && rm)
+    id = GetIDForNVDXObjectHandle(el);
+
+  DoSerialise(ser, id);
+
+  if(ser.IsReading())
+  {
+    if(id != ResourceId() && rm && rm->HasLiveResource(id))
+      el = (NVDX_ObjectHandle__ *)rm->GetLiveVendorResource(id);
+    else
+      el = NULL;
+  }
+}
+
 #undef SERIALISE_INTERFACE
 #define SERIALISE_INTERFACE(iface)                  \
   template <class SerialiserType>                   \
@@ -60,6 +103,22 @@ void DoSerialiseViaResourceId(SerialiserType &ser, Interface *&el)
   INSTANTIATE_SERIALISE_TYPE(iface *);
 
 SERIALISE_D3D_INTERFACES();
+
+
+template <class SerialiserType>
+void DoSerialise(SerialiserType &ser, NVDX_ObjectHandle__ *&el)
+{
+  DoSerialiseNVDXObjectHandleViaResourceId(ser, el);
+}
+
+template <class SerialiserType>
+void DoSerialise(SerialiserType &ser, NVDX_ObjectHandle__ const*&el)
+{
+  DoSerialiseNVDXObjectHandleViaResourceId(ser, el);
+}
+
+INSTANTIATE_SERIALISE_TYPE(NVDX_ObjectHandle__ *)
+INSTANTIATE_SERIALISE_TYPE(NVDX_ObjectHandle__ const*)
 
 template <class SerialiserType>
 void DoSerialise(SerialiserType &ser, D3D11_BUFFER_DESC &el)

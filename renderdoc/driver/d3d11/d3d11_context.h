@@ -31,6 +31,9 @@
 #include "d3d11_manager.h"
 #include "d3d11_video.h"
 
+struct NVDX_ObjectHandle__;
+enum _NvAPI_Status;
+
 struct MapIntercept
 {
   MapIntercept()
@@ -276,6 +279,8 @@ private:
                                ID3D11DepthStencilView *DSV, UINT UAVStartSlot, UINT NumUAVs,
                                ID3D11UnorderedAccessView *UAVs[]);
 
+  template <class SerialiserType>
+  friend void DoSerialise(SerialiserType &ser, NVDX_ObjectHandle__ *&el);
 ////////////////////////////////////////////////////////////////
 // implement InterceptorSystem privately, since it is not thread safe (like all other context
 // functions)
@@ -508,6 +513,11 @@ public:
                                                                                                     \
   IMPLEMENT_FUNCTION_SERIALISED(virtual void STDMETHODCALLTYPE, Dispatch, UINT ThreadGroupCountX,   \
                                 UINT ThreadGroupCountY, UINT ThreadGroupCountZ);                    \
+  IMPLEMENT_FUNCTION_SERIALISED(                                                                    \
+      virtual void STDMETHODCALLTYPE, LaunchCubinShader, NVDX_ObjectHandle__ *hShader, UINT gridX,  \
+      UINT gridY, UINT gridZ, const void *pParams, UINT paramSize,                                  \
+      const NVDX_ObjectHandle__ **pReadResources, UINT numReadResources,                            \
+      const NVDX_ObjectHandle__ **pWriteResources, UINT numWriteResources);                         \
                                                                                                     \
   IMPLEMENT_FUNCTION_SERIALISED(virtual void STDMETHODCALLTYPE, DispatchIndirect,                   \
                                 ID3D11Buffer *pBufferForArgs, UINT AlignedByteOffsetForArgs);       \

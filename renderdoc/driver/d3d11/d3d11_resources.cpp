@@ -735,3 +735,26 @@ WrappedID3DDeviceContextState::~WrappedID3DDeviceContextState()
     WrappedID3DDeviceContextState::m_List.removeOne(this);
   }
 }
+
+WrappedCubinShader::WrappedCubinShader(NVDX_ObjectHandle__ *real, ResourceId origId, const byte *code,
+                                       size_t codeLen, const char *name, uint32_t blkx,
+                                       uint32_t blky, uint32_t blkz, WrappedID3D11Device *device)
+
+    : WrappedVendorResource<NVDX_ObjectHandle__*>(real),
+      m_Fatbin(code, codeLen),
+      m_Name(name),
+      m_BlockX(blkx),
+      m_BlockY(blky),
+      m_BlockZ(blkz),
+      m_pDevice(device)
+{
+  m_pDevice->AddRef();
+
+  if (origId != ResourceId())
+  {
+    m_ID = origId;
+  }
+  // bool ret = m_pDevice->GetResourceManager()->AddWrapper(this, real);
+
+  // m_pDevice->GetResourceManager()->AddCurrentResource(m_ResourceId, this);
+}

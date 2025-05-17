@@ -168,6 +168,22 @@ enum D3D11TextureDetailsType
   eTexType_Max
 };
 
+template <class SerialiserType>
+inline void DoSerialise(SerialiserType &ser, struct NVDX_ObjectHandle__ *&el);
+template <class SerialiserType>
+inline void DoSerialise(SerialiserType &ser, struct NVDX_ObjectHandle__ const*&el);
+
+template <>
+inline rdcliteral TypeName<NVDX_ObjectHandle__*>()
+{
+  return "NVDX_ObjectHandle"_lit;
+}
+template <>
+inline rdcliteral TypeName<NVDX_ObjectHandle__ const *>()
+{
+  return "NVDX_ObjectHandle"_lit;
+}
+
 template <typename T>
 inline const ResourceRange &GetResourceRange(T *);
 
@@ -403,6 +419,15 @@ enum class D3D11Chunk : uint32_t
   OpenSharedResource1,
   OpenSharedResourceByName,
   SetShaderExtUAV,
+
+  NvApi_CreateCubinShader,
+  NvApi_LaunchCubinShader,
+  NvApi_DestroyCubinShader,
+  NvApi_CreateSamplerState,
+  NvApi_CreateSRV,
+  NvApi_CreateUAV,
+  NvApi_GetCudaTextureObject,
+  NvApi_GetResourceHandle,
   Max,
 };
 

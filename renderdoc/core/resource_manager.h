@@ -545,6 +545,14 @@ bool ResourceRecord::MarkResourceFrameReferenced(ResourceId id, FrameRefType ref
   return MarkReferenced(m_FrameRefs, id, refType, comp);
 }
 
+struct IVendorResource
+{
+  virtual ~IVendorResource() {}
+  const ResourceId &GetResourceID() const { return m_ID; }
+  virtual const rdcstr &GetName() const = 0;
+protected:
+  ResourceId m_ID;
+};
 // the resource manager is a utility class that's not required but is likely wanted by any API
 // implementation.
 // It keeps track of resource records, which resources are alive and allows you to query for them by
@@ -638,8 +646,10 @@ public:
 
   // Live resources to replace serialised IDs
   void AddLiveResource(ResourceId origid, WrappedResourceType livePtr);
+  void AddLiveVendorResource(ResourceId origid, IVendorResource *livePtr);
   bool HasLiveResource(ResourceId origid);
   WrappedResourceType GetLiveResource(ResourceId origid, bool optional = false);
+  IVendorResource* GetLiveVendorResource(ResourceId origid, bool optional = false);
   void EraseLiveResource(ResourceId origid);
 
   // when asked for a given id, return the resource for a replacement id
@@ -761,6 +771,7 @@ protected:
 
   // used during replay - holds resources allocated and the original id that they represent
   std::unordered_map<ResourceId, WrappedResourceType> m_LiveResourceMap;
+  std::unordered_map<ResourceId, IVendorResource*> m_LiveVendorResourceMap;
 
   // used during capture - holds resource records by id.
   std::unordered_map<ResourceId, RecordType *> m_ResourceRecords;
@@ -1869,6 +1880,30 @@ void ResourceManager<Configuration>::AddLiveResource(ResourceId origid, WrappedR
   m_LiveResourceMap[origid] = livePtr;
 }
 
+
+template <typename Configuration>
+void ResourceManager<Configuration>::AddLiveVendorResource(ResourceId origid, IVendorResource* livePtr)
+{
+  SCOPED_LOCK_OPTIONAL(m_Lock, m_Capturing);
+
+  if(origid == ResourceId() || livePtr == nullptr)
+  {
+    RDCERR("Invalid state adding resource mapping - id is invalid or live pointer is NULL");
+  }
+
+  m_OriginalIDs[livePtr->GetResourceID()] = origid;
+  m_LiveIDs[origid] = livePtr->GetResourceID();
+
+  if(m_LiveVendorResourceMap.find(origid) != m_LiveVendorResourceMap.end())
+  {
+    RDCERR("Releasing live vendor resource for duplicate creation: %s", ToStr(origid).c_str());
+    //ResourceTypeRelease(m_LiveVendorResourceMap[origid]);
+    m_LiveVendorResourceMap.erase(origid);
+  }
+
+  m_LiveVendorResourceMap[origid] = livePtr;
+}
+
 template <typename Configuration>
 bool ResourceManager<Configuration>::HasLiveResource(ResourceId origid)
 {
@@ -1878,7 +1913,8 @@ bool ResourceManager<Configuration>::HasLiveResource(ResourceId origid)
     return false;
 
   return (m_Replacements.find(origid) != m_Replacements.end() ||
-          m_LiveResourceMap.find(origid) != m_LiveResourceMap.end());
+          m_LiveResourceMap.find(origid) != m_LiveResourceMap.end() ||
+          m_LiveVendorResourceMap.find(origid) != m_LiveVendorResourceMap.end());
 }
 
 template <typename Configuration>
@@ -1910,6 +1946,37 @@ typename Configuration::WrappedResourceType ResourceManager<Configuration>::GetL
   }
 
   return (WrappedResourceType)RecordType::NullResource;
+}
+
+template <typename Configuration>
+IVendorResource* ResourceManager<Configuration>::GetLiveVendorResource(
+    ResourceId origid, bool optional)
+{
+  SCOPED_LOCK_OPTIONAL(m_Lock, m_Capturing);
+
+  if(origid == ResourceId())
+    return nullptr;
+
+#if DISABLED(RDOC_RELEASE)
+  if(!optional)
+  {
+    RDCASSERT(HasLiveResource(origid), origid);
+  }
+#endif
+
+  {
+    auto it = m_Replacements.find(origid);
+    if(it != m_Replacements.end())
+      return GetLiveVendorResource(it->second);
+  }
+
+  {
+    auto it = m_LiveVendorResourceMap.find(origid);
+    if(it != m_LiveVendorResourceMap.end())
+      return it->second;
+  }
+
+  return nullptr;
 }
 
 template <typename Configuration>

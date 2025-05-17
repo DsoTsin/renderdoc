@@ -38,6 +38,8 @@
 #include "d3d11_replay.h"
 #include "d3d11_resources.h"
 #include "d3d11_shader_cache.h"
+#include "driver/dx/official/d3d11.h"
+#include "../ihv/nv/official/nvapi/nvapi.h"
 
 RDOC_EXTERN_CONFIG(bool, Replay_Debug_PrintChunkTimings);
 
@@ -502,6 +504,57 @@ BOOL STDMETHODCALLTYPE WrappedNVAPI11::SetShaderExtUAV(DWORD space, DWORD reg, B
   return TRUE;
 }
 
+_NvAPI_Status STDMETHODCALLTYPE WrappedNVAPI11::D3D11_CreateCubinComputeShader(
+    const void *pCubin, uint32_t size, uint32_t blockX, uint32_t blockY, uint32_t blockZ,
+    const char *pName, NVDX_ObjectHandle__ **phShader)
+{
+  m_pDevice.CreateCubinComputeShader(pCubin, size, blockX, blockY, blockZ, pName, phShader);
+  return NVAPI_OK;
+}
+
+_NvAPI_Status STDMETHODCALLTYPE
+WrappedNVAPI11::D3D11_DestroyCubinComputeShader(NVDX_ObjectHandle__* hShader)
+{
+  m_pDevice.DestroyCubinComputeShader(hShader);
+  return NVAPI_OK;
+}
+
+_NvAPI_Status STDMETHODCALLTYPE WrappedNVAPI11::D3D11_CreateSamplerState(
+    const D3D11_SAMPLER_DESC *pSamplerDesc, ID3D11SamplerState **ppSamplerState,
+    uint32_t *pDriverHandle)
+{
+  m_pDevice.NvCreateSamplerState(pSamplerDesc, ppSamplerState, pDriverHandle);
+  return NVAPI_OK;
+}
+
+_NvAPI_Status STDMETHODCALLTYPE WrappedNVAPI11::D3D11_CreateShaderResourceView(
+    ID3D11Resource *pResource, const D3D11_SHADER_RESOURCE_VIEW_DESC *pDesc,
+    ID3D11ShaderResourceView **ppSRV, uint32_t *pDriverHandle)
+{
+  m_pDevice.NvCreateShaderResourceView(pResource, pDesc, ppSRV, pDriverHandle);
+  return NVAPI_OK;
+}
+
+_NvAPI_Status __stdcall WrappedNVAPI11::D3D11_CreateUnorderedAccessView(
+    ID3D11Resource *pResource, const D3D11_UNORDERED_ACCESS_VIEW_DESC *pDesc,
+    ID3D11UnorderedAccessView **ppUAV, uint32_t *pDriverHandle)
+{
+  m_pDevice.NvCreateUnorderedAccessView(pResource, pDesc, ppUAV, pDriverHandle);
+  return NVAPI_OK;
+}
+
+_NvAPI_Status STDMETHODCALLTYPE WrappedNVAPI11::D3D11_GetResourceHandle(ID3D11Resource *pResource,
+                                                                        NVDX_ObjectHandle__ **phObject)
+{
+  return NVAPI_OK;
+}
+
+_NvAPI_Status STDMETHODCALLTYPE WrappedNVAPI11::D3D11_GetCudaTextureObject(
+    uint32_t srvDriverHandle, uint32_t samplerDriverHandle, uint32_t *pCudaTextureHandle)
+{
+  return NVAPI_OK;
+}
+
 HRESULT STDMETHODCALLTYPE WrappedAGS11::QueryInterface(REFIID riid, void **ppvObject)
 {
   return E_NOINTERFACE;
@@ -579,7 +632,7 @@ HRESULT WrappedID3D11Device::QueryInterface(REFIID riid, void **ppvObject)
 
   // RenderDoc UUID {A7AA6116-9C8D-4BBA-9083-B4D816B71B78}
   static const GUID IRenderDoc_uuid = {
-      0xa7aa6116, 0x9c8d, 0x4bba, {0x90, 0x83, 0xb4, 0xd8, 0x16, 0xb7, 0x1b, 0x78}};
+      0xb7aa6116, 0x9c8d, 0x4bba, {0x90, 0x83, 0xb4, 0xd8, 0x16, 0xb7, 0x1b, 0x78}};
 
   // UUID for returning unwrapped ID3D11InfoQueue {3FC4E618-3F70-452A-8B8F-A73ACCB58E3D}
   static const GUID unwrappedID3D11InfoQueue__uuid = {
@@ -1054,6 +1107,15 @@ bool WrappedID3D11Device::ProcessChunk(ReadSerialiser &ser, D3D11Chunk context)
 
       return true;
     }
+    case D3D11Chunk::NvApi_CreateSamplerState:
+      return Serialise_NvCreateSamplerState(ser, 0x0, 0, 0x0);
+    case D3D11Chunk::NvApi_CreateCubinShader:
+      return Serialise_CreateCubinComputeShader(ser, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0);
+    case D3D11Chunk::NvApi_DestroyCubinShader: return Serialise_DestroyCubinComputeShader(ser, 0x0);
+    case D3D11Chunk::NvApi_CreateSRV:
+      return Serialise_NvCreateShaderResourceView(ser, 0x0, 0x0, 0x0, 0x0);
+    case D3D11Chunk::NvApi_CreateUAV:
+      return Serialise_NvCreateUnorderedAccessView(ser, 0x0, 0x0, 0x0, 0x0);
     case D3D11Chunk::SetResourceName: return Serialise_SetResourceName(ser, 0x0, "");
     case D3D11Chunk::CreateSwapBuffer:
       return Serialise_WrapSwapchainBuffer(ser, 0x0, DXGI_FORMAT_UNKNOWN, 0, 0x0);
@@ -1229,6 +1291,12 @@ bool WrappedID3D11Device::ProcessChunk(ReadSerialiser &ser, D3D11Chunk context)
     case D3D11Chunk::PostExecuteCommandList:
     case D3D11Chunk::PostFinishCommandListSet:
     case D3D11Chunk::SwapDeviceContextState:
+
+    // dlss related api
+    case D3D11Chunk::NvApi_LaunchCubinShader:
+    case D3D11Chunk::NvApi_GetCudaTextureObject:
+    case D3D11Chunk::NvApi_GetResourceHandle:
+
     case D3D11Chunk::SwapchainPresent: return m_pImmediateContext->ProcessChunk(ser, context);
 
     // no explicit default so that we have compiler warnings if a chunk isn't explicitly handled.
@@ -2839,14 +2907,15 @@ void WrappedID3D11Device::RemoveDeferredContext(WrappedID3D11DeviceContext *defc
   m_DeferredContexts.erase(defctx);
 }
 
-void WrappedID3D11Device::AddResource(ResourceId id, ResourceType type, const char *defaultNamePrefix)
+void WrappedID3D11Device::AddResource(ResourceId id, ResourceType type,
+                                      const char *defaultNamePrefix, bool autogen)
 {
   ResourceDescription &descr = GetReplay()->GetResourceDesc(id);
 
   uint64_t num;
   memcpy(&num, &id, sizeof(uint64_t));
   descr.name = defaultNamePrefix + (" " + ToStr(num));
-  descr.autogeneratedName = true;
+  descr.autogeneratedName = autogen;
   descr.type = type;
   AddResourceCurChunk(descr);
 }

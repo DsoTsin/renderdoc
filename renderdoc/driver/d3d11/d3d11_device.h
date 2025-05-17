@@ -37,6 +37,9 @@
 #include "d3d11_manager.h"
 #include "d3d11_video.h"
 
+struct NVDX_ObjectHandle__;
+enum _NvAPI_Status;
+
 class D3D11DebugManager;
 class D3D11TextRenderer;
 class D3D11ShaderCache;
@@ -190,6 +193,30 @@ public:
   {
     return NULL;
   }
+
+  virtual _NvAPI_Status STDMETHODCALLTYPE
+  D3D11_CreateCubinComputeShader(const void *pCubin, uint32_t size, uint32_t blockX, uint32_t blockY, uint32_t blockZ,
+      const char *pName, NVDX_ObjectHandle__ **phShader) override;
+  virtual _NvAPI_Status STDMETHODCALLTYPE
+  D3D11_DestroyCubinComputeShader(NVDX_ObjectHandle__ *hShader) override;
+
+  virtual _NvAPI_Status STDMETHODCALLTYPE
+  D3D11_CreateSamplerState(const D3D11_SAMPLER_DESC *pSamplerDesc,
+                           ID3D11SamplerState **ppSamplerState, uint32_t *pDriverHandle) override;
+  virtual _NvAPI_Status STDMETHODCALLTYPE D3D11_CreateShaderResourceView(
+      ID3D11Resource *pResource, const D3D11_SHADER_RESOURCE_VIEW_DESC *pDesc,
+      ID3D11ShaderResourceView **ppSRV, uint32_t *pDriverHandle) override;
+  virtual _NvAPI_Status STDMETHODCALLTYPE D3D11_CreateUnorderedAccessView(
+      ID3D11Resource *pResource, __in const D3D11_UNORDERED_ACCESS_VIEW_DESC *pDesc,
+      ID3D11UnorderedAccessView **ppUAV, uint32_t *pDriverHandle) override;
+  virtual _NvAPI_Status STDMETHODCALLTYPE
+  D3D11_GetResourceHandle(ID3D11Resource *pResource, NVDX_ObjectHandle__ **phObject) override;
+
+  virtual _NvAPI_Status STDMETHODCALLTYPE D3D11_GetCudaTextureObject(
+      uint32_t srvDriverHandle, uint32_t samplerDriverHandle, uint32_t *pCudaTextureHandle) override;
+
+private:
+  std::unordered_map<NVDX_ObjectHandle__ *, NVDX_ObjectHandle__ *> m_NvDxResourceMap;
 };
 
 struct WrappedAGS11 : public IAGSD3DDevice
@@ -601,6 +628,7 @@ private:
 
   std::map<ResourceId, StreamOutData> m_StreamOutCounters;
   std::map<ResourceId, SOShaderData> m_SOShaders;
+  //std::unordered_map<NVDX_ObjectHandle__ *, CubinShader> m_CubinShaders;
 
   static WrappedID3D11Device *m_pCurrentWrappedDevice;
 
@@ -649,7 +677,7 @@ public:
 
   APIProperties APIProps;
 
-  void AddResource(ResourceId id, ResourceType type, const char *defaultNamePrefix);
+  void AddResource(ResourceId id, ResourceType type, const char *defaultNamePrefix, bool autogen = true);
   void DerivedResource(ID3D11DeviceChild *parent, ResourceId child);
   void AddResourceCurChunk(ResourceDescription &descr);
   void AddResourceCurChunk(ResourceId id);
@@ -759,6 +787,9 @@ public:
   }
   ////////////////////////////////////////////////////////////////
   // log replaying
+
+  template <class SerialiserType>
+  friend void DoSerialise(SerialiserType &ser, NVDX_ObjectHandle__ *&el);
 
   bool Prepare_InitialState(ID3D11DeviceChild *res);
   uint64_t GetSize_InitialState(ResourceId id, const D3D11InitialContents &initial);
@@ -1153,4 +1184,24 @@ public:
                                                 REFIID riid, void **ppFence);
 
   virtual HRESULT STDMETHODCALLTYPE OpenSharedFence(HANDLE hFence, REFIID riid, void **ppFence);
+
+  // Nv APIs  
+#define SERIALISED_ID3D11NVAPI_FUNCTIONS()                                                        \
+  IMPLEMENT_FUNCTION_SERIALISED(_NvAPI_Status, CreateCubinComputeShader, const void *pCubin,      \
+                                uint32_t size, uint32_t blockX, uint32_t blockY, uint32_t blockZ, \
+                                const char *pName, NVDX_ObjectHandle__ **phShader);               \
+  IMPLEMENT_FUNCTION_SERIALISED(_NvAPI_Status, DestroyCubinComputeShader,                         \
+                                NVDX_ObjectHandle__ *phShader);                                   \
+  IMPLEMENT_FUNCTION_SERIALISED(_NvAPI_Status, NvCreateSamplerState,                              \
+                                const D3D11_SAMPLER_DESC *pSamplerDesc,                           \
+                                ID3D11SamplerState **ppSamplerState, uint32_t *pDriverHandle);    \
+  IMPLEMENT_FUNCTION_SERIALISED(_NvAPI_Status, NvCreateShaderResourceView,                        \
+                                ID3D11Resource *pResource,                                        \
+                                const D3D11_SHADER_RESOURCE_VIEW_DESC *pDesc,                     \
+                                ID3D11ShaderResourceView **ppSRV, uint32_t *pDriverHandle);       \
+  IMPLEMENT_FUNCTION_SERIALISED(_NvAPI_Status, NvCreateUnorderedAccessView,                       \
+                                ID3D11Resource *pResource,                                        \
+                                const D3D11_UNORDERED_ACCESS_VIEW_DESC *pDesc,                    \
+                                ID3D11UnorderedAccessView **ppUAV, uint32_t *pDriverHandle);
+  SERIALISED_ID3D11NVAPI_FUNCTIONS()
 };

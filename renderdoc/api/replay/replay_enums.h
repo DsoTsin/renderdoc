@@ -700,6 +700,8 @@ enum class ResourceType : uint32_t
   AccelerationStructure,
 
   DescriptorStore,
+
+  CubinShader = 44,
 };
 
 DECLARE_REFLECTION_ENUM(ResourceType);

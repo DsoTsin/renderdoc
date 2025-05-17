@@ -28,6 +28,8 @@
 #include "driver/shaders/dxbc/dxbc_container.h"
 #include "d3d11_device.h"
 #include "d3d11_manager.h"
+//#include "../ihv/nv/official/nvapi/nvapi.h"
+struct NVDX_ObjectHandle__;
 
 D3D11ResourceType IdentifyTypeByPtr(IUnknown *ptr);
 template <typename T>
@@ -418,6 +420,18 @@ inline ResourceId GetIDForDeviceChild(ID3D11DeviceChild *child)
   if(child)
     return ((WrappedDeviceChild11<ID3D11Resource> *)child)->GetResourceID();
   return ResourceId();
+}
+
+inline ResourceId GetIDForNVDXObjectHandle(NVDX_ObjectHandle__ *handle)
+{
+  IVendorResource *vendorRes = (IVendorResource *)handle;
+  return vendorRes ? vendorRes->GetResourceID() : ResourceId();
+}
+
+inline ResourceId GetIDForNVDXObjectHandle(NVDX_ObjectHandle__ const*handle)
+{
+  IVendorResource *vendorRes = (IVendorResource *)handle;
+  return vendorRes ? vendorRes->GetResourceID() : ResourceId();
 }
 
 inline void IntAddRef(ID3D11DeviceChild *child)
@@ -1103,6 +1117,40 @@ public:
 
 private:
   ResourceId m_ID;
+};
+
+
+template <typename RealVendorType>
+struct WrappedVendorResource : public IVendorResource
+{
+  WrappedVendorResource(RealVendorType real) : m_Real(real)
+  {
+    m_ID = ResourceIDGen::GetNewUniqueID();
+  }
+
+  RealVendorType real() const { return m_Real; }
+
+private:
+  RealVendorType m_Real;
+};
+
+struct WrappedCubinShader : public WrappedVendorResource<NVDX_ObjectHandle__ *>
+{
+public:
+  WrappedCubinShader(NVDX_ObjectHandle__ *real, ResourceId origId, const byte *code, size_t codeLen,
+                     const char *name, uint32_t blkx, uint32_t blky, uint32_t blkz,
+                     WrappedID3D11Device *device);
+  virtual ~WrappedCubinShader() {}
+  virtual const rdcstr &GetName() const override { return m_Name; }
+private:
+  bytebuf m_Fatbin;
+  rdcstr m_Name;
+  uint32_t m_BlockX;
+  uint32_t m_BlockY;
+  uint32_t m_BlockZ;
+  WrappedID3D11Device *m_pDevice;
+  int32_t m_ExtRef;
+  int32_t m_IntRef;
 };
 
 template <class RealShaderType>

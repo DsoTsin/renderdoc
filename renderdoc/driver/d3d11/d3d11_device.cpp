@@ -546,12 +546,20 @@ _NvAPI_Status __stdcall WrappedNVAPI11::D3D11_CreateUnorderedAccessView(
 _NvAPI_Status STDMETHODCALLTYPE WrappedNVAPI11::D3D11_GetResourceHandle(ID3D11Resource *pResource,
                                                                         NVDX_ObjectHandle__ **phObject)
 {
+  m_pDevice.NvGetResourceHandle(pResource, phObject);
+  return NVAPI_OK;
+}
+
+_NvAPI_Status __stdcall WrappedNVAPI11::D3D11_GetResourceGpuVa(NvGetGpuVa* params)
+{
+  m_pDevice.NvGetResourceGpuVa(params);
   return NVAPI_OK;
 }
 
 _NvAPI_Status STDMETHODCALLTYPE WrappedNVAPI11::D3D11_GetCudaTextureObject(
     uint32_t srvDriverHandle, uint32_t samplerDriverHandle, uint32_t *pCudaTextureHandle)
 {
+  m_pDevice.NvGetCudaTextureObject(srvDriverHandle, samplerDriverHandle, pCudaTextureHandle);
   return NVAPI_OK;
 }
 
@@ -1116,6 +1124,10 @@ bool WrappedID3D11Device::ProcessChunk(ReadSerialiser &ser, D3D11Chunk context)
       return Serialise_NvCreateShaderResourceView(ser, 0x0, 0x0, 0x0, 0x0);
     case D3D11Chunk::NvApi_CreateUAV:
       return Serialise_NvCreateUnorderedAccessView(ser, 0x0, 0x0, 0x0, 0x0);
+    case D3D11Chunk::NvApi_GetCudaTextureObject:
+      return Serialise_NvGetCudaTextureObject(ser, 0, 0, 0);
+    case D3D11Chunk::NvApi_GetResourceHandle: return Serialise_NvGetResourceHandle(ser, 0, 0);
+    case D3D11Chunk::NvApi_GetResourceGpuVa: return Serialise_NvGetResourceGpuVa(ser, 0x0);
     case D3D11Chunk::SetResourceName: return Serialise_SetResourceName(ser, 0x0, "");
     case D3D11Chunk::CreateSwapBuffer:
       return Serialise_WrapSwapchainBuffer(ser, 0x0, DXGI_FORMAT_UNKNOWN, 0, 0x0);
@@ -1294,8 +1306,6 @@ bool WrappedID3D11Device::ProcessChunk(ReadSerialiser &ser, D3D11Chunk context)
 
     // dlss related api
     case D3D11Chunk::NvApi_LaunchCubinShader:
-    case D3D11Chunk::NvApi_GetCudaTextureObject:
-    case D3D11Chunk::NvApi_GetResourceHandle:
 
     case D3D11Chunk::SwapchainPresent: return m_pImmediateContext->ProcessChunk(ser, context);
 

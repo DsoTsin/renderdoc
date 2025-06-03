@@ -428,6 +428,7 @@ enum class D3D11Chunk : uint32_t
   NvApi_CreateUAV,
   NvApi_GetCudaTextureObject,
   NvApi_GetResourceHandle,
+  NvApi_GetResourceGpuVa,
   Max,
 };
 
@@ -574,3 +575,11 @@ DECLARE_REFLECTION_STRUCT(D3D11_SUBRESOURCE_DATA);
 DECLARE_REFLECTION_STRUCT(D3D11_VIEWPORT);
 DECLARE_REFLECTION_STRUCT(D3D11_RECT);
 DECLARE_REFLECTION_STRUCT(D3D11_BOX);
+
+struct NvGetGpuVa
+{
+  NVDX_ObjectHandle__ *object;
+  uint64_t address;
+  uint64_t size;
+};
+DECLARE_REFLECTION_STRUCT(NvGetGpuVa);

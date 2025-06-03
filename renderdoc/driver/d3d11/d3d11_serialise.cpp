@@ -145,6 +145,15 @@ void DoSerialise(SerialiserType &ser, D3D11_TEXTURE1D_DESC &el)
 }
 
 template <class SerialiserType>
+void DoSerialise(SerialiserType &ser, NvGetGpuVa &el)
+{
+  SERIALISE_MEMBER(object).Important();
+  SERIALISE_MEMBER(address);
+  SERIALISE_MEMBER(size);
+}
+INSTANTIATE_SERIALISE_TYPE(NvGetGpuVa);
+
+template <class SerialiserType>
 void DoSerialise(SerialiserType &ser, D3D11_TEXTURE2D_DESC &el)
 {
   SERIALISE_MEMBER(Width).Important();

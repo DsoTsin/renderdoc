@@ -211,7 +211,8 @@ public:
       ID3D11UnorderedAccessView **ppUAV, uint32_t *pDriverHandle) override;
   virtual _NvAPI_Status STDMETHODCALLTYPE
   D3D11_GetResourceHandle(ID3D11Resource *pResource, NVDX_ObjectHandle__ **phObject) override;
-
+  virtual _NvAPI_Status STDMETHODCALLTYPE
+  D3D11_GetResourceGpuVa(NvGetGpuVa* params) override;
   virtual _NvAPI_Status STDMETHODCALLTYPE D3D11_GetCudaTextureObject(
       uint32_t srvDriverHandle, uint32_t samplerDriverHandle, uint32_t *pCudaTextureHandle) override;
 
@@ -1185,7 +1186,7 @@ public:
 
   virtual HRESULT STDMETHODCALLTYPE OpenSharedFence(HANDLE hFence, REFIID riid, void **ppFence);
 
-  // Nv APIs  
+  // Nv APIs
 #define SERIALISED_ID3D11NVAPI_FUNCTIONS()                                                        \
   IMPLEMENT_FUNCTION_SERIALISED(_NvAPI_Status, CreateCubinComputeShader, const void *pCubin,      \
                                 uint32_t size, uint32_t blockX, uint32_t blockY, uint32_t blockZ, \
@@ -1202,6 +1203,11 @@ public:
   IMPLEMENT_FUNCTION_SERIALISED(_NvAPI_Status, NvCreateUnorderedAccessView,                       \
                                 ID3D11Resource *pResource,                                        \
                                 const D3D11_UNORDERED_ACCESS_VIEW_DESC *pDesc,                    \
-                                ID3D11UnorderedAccessView **ppUAV, uint32_t *pDriverHandle);
+                                ID3D11UnorderedAccessView **ppUAV, uint32_t *pDriverHandle);      \
+  IMPLEMENT_FUNCTION_SERIALISED(_NvAPI_Status, NvGetResourceHandle, ID3D11Resource *pResource,    \
+                                NVDX_ObjectHandle__ **phObject);                                  \
+  IMPLEMENT_FUNCTION_SERIALISED(_NvAPI_Status, NvGetResourceGpuVa, NvGetGpuVa *param);            \
+  IMPLEMENT_FUNCTION_SERIALISED(_NvAPI_Status, NvGetCudaTextureObject, uint32_t srvDriverHandle,  \
+                                uint32_t samplerDriverHandle, uint32_t *pCudaTextureHandle);
   SERIALISED_ID3D11NVAPI_FUNCTIONS()
 };

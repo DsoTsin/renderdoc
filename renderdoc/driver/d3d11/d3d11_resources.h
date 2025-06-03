@@ -124,9 +124,10 @@ private:
 protected:
   WrappedID3D11Device *m_pDevice;
   NestedType *m_pReal;
+  uint32_t m_DriverHandle;
 
-  WrappedDeviceChild11(NestedType *real, WrappedID3D11Device *device)
-      : m_pDevice(device), m_pReal(real), m_ExtRef(1), m_IntRef(0)
+  WrappedDeviceChild11(NestedType *real, WrappedID3D11Device *device, uint32_t driverHandle = (uint32_t)-1)
+      : m_pDevice(device), m_pReal(real), m_DriverHandle(driverHandle), m_ExtRef(1), m_IntRef(0)
   {
     m_ID = ResourceIDGen::GetNewUniqueID();
 
@@ -154,6 +155,8 @@ public:
 
   ResourceId GetResourceID() { return m_ID; }
   NestedType *GetReal() { return m_pReal; }
+  uint32_t GetDriverHandle() const { return m_DriverHandle; }
+  void SetDriverHandle(uint32_t handle) { m_DriverHandle = handle; }
   // internal addref/release
   void IntAddRef() { Atomic::Inc32(&m_IntRef); }
   void IntRelease()
@@ -820,8 +823,8 @@ class WrappedID3D11SamplerState : public WrappedDeviceChild11<ID3D11SamplerState
 public:
   ALLOCATE_WITH_WRAPPED_POOL(WrappedID3D11SamplerState);
 
-  WrappedID3D11SamplerState(ID3D11SamplerState *real, WrappedID3D11Device *device)
-      : WrappedDeviceChild11<ID3D11SamplerState>(real, device)
+  WrappedID3D11SamplerState(ID3D11SamplerState *real, WrappedID3D11Device *device, uint32_t driverHandle = (uint32_t)-1)
+      : WrappedDeviceChild11<ID3D11SamplerState>(real, device, driverHandle)
   {
   }
   virtual ~WrappedID3D11SamplerState() {}
@@ -839,8 +842,10 @@ protected:
   ResourceId m_ResourceResID;
   ResourceRange m_ResourceRange;
 
-  WrappedView1(NestedType *real, WrappedID3D11Device *device, ID3D11Resource *res)
-      : WrappedDeviceChild11(real, device), m_pResource(res), m_ResourceRange(this)
+  WrappedView1(NestedType *real, WrappedID3D11Device *device, ID3D11Resource *res, uint32_t driverHandle = (uint32_t)-1)
+      : WrappedDeviceChild11(real, device, driverHandle),
+        m_pResource(res),
+        m_ResourceRange(this)
   {
     m_ResourceResID = GetIDForDeviceChild(m_pResource);
     ::IntAddRef(m_pResource);
@@ -926,8 +931,8 @@ public:
   ALLOCATE_WITH_WRAPPED_POOL(WrappedID3D11ShaderResourceView1);
 
   WrappedID3D11ShaderResourceView1(ID3D11ShaderResourceView *real, ID3D11Resource *res,
-                                   WrappedID3D11Device *device)
-      : WrappedView1(real, device, res)
+                                   WrappedID3D11Device *device, uint32_t vendorHandle = (uint32_t)-1)
+      : WrappedView1(real, device, res, vendorHandle)
   {
   }
   virtual ~WrappedID3D11ShaderResourceView1() {}
@@ -966,8 +971,8 @@ public:
   ALLOCATE_WITH_WRAPPED_POOL(WrappedID3D11UnorderedAccessView1);
 
   WrappedID3D11UnorderedAccessView1(ID3D11UnorderedAccessView *real, ID3D11Resource *res,
-                                    WrappedID3D11Device *device)
-      : WrappedView1(real, device, res)
+                                    WrappedID3D11Device *device, uint32_t vendorHandle = (uint32_t)-1)
+      : WrappedView1(real, device, res, vendorHandle)
   {
   }
   virtual ~WrappedID3D11UnorderedAccessView1() {}
@@ -1134,6 +1139,65 @@ private:
   RealVendorType m_Real;
 };
 
+#define FATBIN_TEXT_MAGIC 0xBA55ED50
+
+enum class FatBinFlag : uint64_t
+{
+  None = 0x0,
+  Is64Bit = 0x1ULL << 0,
+  Debug = 0x1ULL << 1,
+  Cuda = 0x1ULL << 2,
+  OpenCL = 0x1ULL << 3,
+  Linux = 0x1ULL << 4,
+  Mac = 0x1ULL << 5,
+  Windows = 0x1ULL << 6,
+  // HostMask = 0xf0,
+  // OptLevelMask = 0xf00,
+  CompressZlib = 0x1ULL << 12,
+  CompressLz = 0x1ULL << 13,
+  All = ~0ull
+};
+
+enum class FatBinKind : uint16_t
+{
+  PTX = 0x0001,
+  ELF = 0x0002,
+  NVVM = 0x0008,
+  MERCURY = 0x0010,
+};
+
+#ifdef __GNUC__
+#define PACK(__Declaration__) __Declaration__ __attribute__((__packed__))
+#endif
+
+#ifdef _MSC_VER
+#define PACK(__Declaration__) __pragma(pack(push, 1)) __Declaration__ __pragma(pack(pop))
+#endif
+
+PACK(struct FatBinHeader {
+  uint32_t magic;
+  uint16_t version;
+  uint16_t header_size;
+  uint64_t size;
+});
+
+PACK(struct FatCodeHeader {
+  FatBinKind kind;
+  uint16_t version;
+  uint32_t header_size;
+  uint64_t size;
+  uint32_t compressed_size;
+  uint32_t kind_offset;
+  uint16_t minor;
+  uint16_t major;
+  uint32_t arch;
+  uint32_t obj_name_offset;
+  uint32_t obj_name_len;
+  FatBinFlag flags;
+  uint64_t obfuscation_key;
+  uint64_t decompressed_size;
+});
+
 struct WrappedCubinShader : public WrappedVendorResource<NVDX_ObjectHandle__ *>
 {
 public:
@@ -1142,8 +1206,11 @@ public:
                      WrappedID3D11Device *device);
   virtual ~WrappedCubinShader() {}
   virtual const rdcstr &GetName() const override { return m_Name; }
+
+  friend class CubinParser;
 private:
   bytebuf m_Fatbin;
+  rdcarray<FatCodeHeader> m_FatCodes;
   rdcstr m_Name;
   uint32_t m_BlockX;
   uint32_t m_BlockY;

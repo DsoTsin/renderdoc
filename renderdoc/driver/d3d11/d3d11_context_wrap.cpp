@@ -31,6 +31,7 @@
 #include "d3d11_renderstate.h"
 #include "d3d11_resources.h"
 #include "d3d11_common.h"
+#include <sstream>
 #include "../ihv/nv/official/nvapi/nvapi.h"
 
 #ifndef DXGI_ERROR_INVALID_CALL
@@ -5111,6 +5112,30 @@ void WrappedID3D11DeviceContext::Dispatch(UINT ThreadGroupCountX, UINT ThreadGro
   }
 }
 
+#pragma optimize("",off)
+
+class CubinParser
+{
+public:
+  struct ParamInfo
+  {
+  };
+
+  CubinParser(WrappedCubinShader *shader)
+      : kernelName(shader->m_Name), ptr(shader->m_Fatbin.data()), len(shader->m_Fatbin.size())
+  {
+
+  }
+
+  void parse();
+
+private:
+  rdcstr kernelName;
+  //ELFIO::elfio elf_reader;
+  const uint8_t *ptr;
+  size_t len;
+};
+
 template <typename SerialiserType>
 bool WrappedID3D11DeviceContext::Serialise_LaunchCubinShader(
     SerialiserType &ser, 
@@ -5136,6 +5161,8 @@ bool WrappedID3D11DeviceContext::Serialise_LaunchCubinShader(
   if(IsReplayingAndReading())
   {
     WrappedCubinShader *cubinShader = (WrappedCubinShader *)hShader;
+    CubinParser parser(cubinShader);
+    parser.parse();
     NvAPI_D3D11_LaunchCubinShader(m_pRealContext, cubinShader->real(), gridX, gridY, gridZ, pParams,
                                   paramSize,
                                   (const NVDX_ObjectHandle *)pReadResources, numReadResources,
@@ -5178,6 +5205,11 @@ bool WrappedID3D11DeviceContext::Serialise_LaunchCubinShader(
   return true;
 }
 
+void CubinParser::parse()
+{
+
+}
+
 void WrappedID3D11DeviceContext::LaunchCubinShader(
     NVDX_ObjectHandle__ *hShader, UINT gridX, UINT gridY, UINT gridZ, 
     const void *pParams, UINT paramSize, 
@@ -5209,6 +5241,7 @@ void WrappedID3D11DeviceContext::LaunchCubinShader(
   }
 }
 
+#pragma optimize("", on)
 template <typename SerialiserType>
 bool WrappedID3D11DeviceContext::Serialise_DispatchIndirect(SerialiserType &ser,
                                                             ID3D11Buffer *pBufferForArgs,
@@ -8262,3 +8295,4 @@ void WrappedID3D11DeviceContext::Unmap(ID3D11Resource *pResource, UINT Subresour
 
 SERIALISED_ID3D11CONTEXT_FUNCTIONS();
 SERIALISED_ID3D11CONTEXT_MARKER_FUNCTIONS();
+

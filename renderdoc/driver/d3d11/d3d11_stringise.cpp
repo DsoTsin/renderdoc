@@ -59,7 +59,7 @@ rdcstr DoStringise(const D3D11ResourceType &el)
 template <>
 rdcstr DoStringise(const D3D11Chunk &el)
 {
-  RDCCOMPILE_ASSERT((uint32_t)D3D11Chunk::Max == 1139, "Chunks changed without updating names");
+  RDCCOMPILE_ASSERT((uint32_t)D3D11Chunk::Max == 1140, "Chunks changed without updating names");
 
   BEGIN_ENUM_STRINGISE(D3D11Chunk)
   {
@@ -222,6 +222,7 @@ rdcstr DoStringise(const D3D11Chunk &el)
     STRINGISE_ENUM_CLASS_NAMED(NvApi_CreateUAV, "Nv::CreateUnorderedAccessView");
     STRINGISE_ENUM_CLASS_NAMED(NvApi_GetCudaTextureObject, "Nv::GetCudaTextureObject");
     STRINGISE_ENUM_CLASS_NAMED(NvApi_GetResourceHandle, "Nv::GetResourceHandle");
+    STRINGISE_ENUM_CLASS_NAMED(NvApi_GetResourceGpuVa, "Nv::GetResourceGpuVa");
 
     STRINGISE_ENUM_CLASS_NAMED(Max, "Max Chunk");
   }

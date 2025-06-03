@@ -446,6 +446,7 @@ private:
   struct Module
   {
     rdcstr name;
+    rdcstr path;
     DWORD64 base;
     DWORD size;
 
@@ -572,7 +573,7 @@ static bool InitDbgHelp()
 }
 
 ///////////////////////////////////////////////////
-
+#pragma optimize("",off)
 struct CV_INFO_PDB70
 {
   DWORD CvSignature;
@@ -594,6 +595,7 @@ struct EnumModChunk
   DWORD age;
   GUID guid;
   size_t imageNameLen;
+  size_t imagePathLen;
   // WCHAR* imageName; // follows (null terminated)
 };
 
@@ -657,6 +659,7 @@ BOOL CALLBACK EnumModule(PCWSTR ModuleName, DWORD64 BaseOfDll, PVOID UserContext
     pdb = ModInfo.ImageName;
 
   chunk.imageNameLen = wcslen(pdb) + 1;    // include null terminator
+  chunk.imagePathLen = wcslen(ModInfo.ImageName) + 1;
 
   if(buf->bufPtr)
   {
@@ -664,13 +667,17 @@ BOOL CALLBACK EnumModule(PCWSTR ModuleName, DWORD64 BaseOfDll, PVOID UserContext
     buf->bufPtr += sizeof(EnumModChunk);
     memcpy(buf->bufPtr, pdb, chunk.imageNameLen * sizeof(WCHAR));
     buf->bufPtr += chunk.imageNameLen * sizeof(WCHAR);
+    memcpy(buf->bufPtr, ModInfo.ImageName, chunk.imagePathLen * sizeof(WCHAR));
+    buf->bufPtr += chunk.imagePathLen * sizeof(WCHAR);
   }
 
-  buf->size += sizeof(EnumModChunk) + chunk.imageNameLen * sizeof(WCHAR);
+  buf->size +=
+      sizeof(EnumModChunk) + chunk.imageNameLen * sizeof(WCHAR) + chunk.imagePathLen * sizeof(WCHAR);
 
   return TRUE;
 }
 
+#pragma optimize("", on)
 void Win32Callstack::Collect()
 {
   rdcarray<PVOID> stack32;
@@ -888,19 +895,22 @@ Win32CallstackResolver::Win32CallstackResolver(bool interactive, byte *moduleDB,
 
   EnumModChunk *chunk = (EnumModChunk *)(chunks);
   WCHAR *modName = (WCHAR *)(chunks + sizeof(EnumModChunk));
+  WCHAR *modPath = (WCHAR *)(chunks + sizeof(EnumModChunk) + (chunk->imageNameLen) * sizeof(WCHAR));
 
   // loop over all our modules
-  for(; chunks < end; chunks += sizeof(EnumModChunk) + (chunk->imageNameLen) * sizeof(WCHAR))
+  for(; chunks < end; chunks += sizeof(EnumModChunk) + (chunk->imageNameLen) * sizeof(WCHAR) +
+                                (chunk->imagePathLen) * sizeof(WCHAR))
   {
     chunk = (EnumModChunk *)chunks;
     modName = (WCHAR *)(chunks + sizeof(EnumModChunk));
-
+    modPath = (WCHAR *)(chunks + sizeof(EnumModChunk) + (chunk->imageNameLen) * sizeof(WCHAR));
     if(progress)
       progress(float(chunks - moduleDB) / float(end - moduleDB));
 
     Module m;
 
     m.name = StringFormat::Wide2UTF8(modName);
+    m.path = StringFormat::Wide2UTF8(modPath);
     m.base = chunk->base;
     m.size = chunk->size;
     m.moduleId = 0;
@@ -947,6 +957,7 @@ Win32CallstackResolver::Win32CallstackResolver(bool interactive, byte *moduleDB,
     }
 
     rdcstr pdbName = defaultPdb;
+    rdcstr peDir = get_dirname(m.path);
 
     int fallbackIdx = -1;
 
@@ -963,14 +974,25 @@ Win32CallstackResolver::Win32CallstackResolver(bool interactive, byte *moduleDB,
         }
         else
         {
-          pdbName = get_dirname(defaultPdb) + "\\" + get_basename(defaultPdb);
-
+          if(peDir.size())
+          {
+            pdbName = peDir + "\\" + get_basename(defaultPdb);
+          }
+          else
+          {
+            pdbName = get_dirname(defaultPdb) + "\\" + get_basename(defaultPdb);
+          }
+            
           // prompt for new pdbName, unless it's renderdoc or dbghelp, or we're non-interactive
           if(pdbName.contains("renderdoc.") || pdbName.contains("dbghelp.") ||
              pdbName.contains("symsrv.") || !interactive)
             pdbName = "";
           else
-            pdbName = pdbBrowse(pdbName);
+          {
+            if(!FileIO::exists(pdbName) || pdbName.endsWith(".dll"))
+              pdbName = "";
+            //pdbBrowse(pdbName);
+          }
 
           // user cancelled, just don't load this pdb
           if(pdbName == "")

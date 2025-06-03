@@ -977,6 +977,7 @@ bool WrappedID3D11DeviceContext::ProcessChunk(ReadSerialiser &ser, D3D11Chunk ch
     case D3D11Chunk::NvApi_CreateUAV:
     case D3D11Chunk::NvApi_GetCudaTextureObject:
     case D3D11Chunk::NvApi_GetResourceHandle:
+    case D3D11Chunk::NvApi_GetResourceGpuVa:
       RDCERR("Unexpected chunk while processing frame: %s", ToStr(chunk).c_str());
       return false;
 

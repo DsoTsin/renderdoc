@@ -126,6 +126,10 @@ typedef NVENCSTATUS(NVENCAPI *PNVENCOPENENCODESESSION)(void *device, uint32_t de
 typedef NVENCSTATUS(NVENCAPI *PNVENCOPENENCODESESSIONEX)(NV_ENC_OPEN_ENCODE_SESSION_EX_PARAMS *params,
                                                          void **encoder);
 
+thread_local bool bHookD3D11CreateSRV = true;
+thread_local bool bHookD3D11CreateUAV = true;
+thread_local bool bHookD3D11CreateSampler = true;
+
 struct NV_ENCODE_API_FUNCTION_LIST
 {
   uint32_t version;
@@ -191,6 +195,8 @@ private:
   HOOK_NVAPI(NvAPI_D3D11_CreateShaderResourceView, 0x65cb431e);            \
   HOOK_NVAPI(NvAPI_D3D11_CreateUnorderedAccessView, 0x74a497a1);           \
   HOOK_NVAPI(NvAPI_D3D11_GetResourceHandle, 0x09d52986);                   \
+  HOOK_NVAPI(NvAPI_D3D11_GetResourceGPUVirtualAddressEx, 0xaf6d14da);      \
+  HOOK_NVAPI(NvAPI_D3D11_GetResourceGPUVirtualAddress, 0x1819b423);        \
   HOOK_NVAPI(NvAPI_D3D12_IsNvShaderExtnOpCodeSupported, 0x3dfacec8);       \
   HOOK_NVAPI(NvAPI_D3D12_SetNvShaderExtnSlotSpace, 0xac2dfeb5);            \
   HOOK_NVAPI(NvAPI_D3D12_SetNvShaderExtnSlotSpaceLocalThread, 0x43d867c0); \
@@ -205,9 +211,8 @@ private:
   WHITELIST_NVAPI(NvAPI_DRS_CreateSession, 0x0694d52e);                    \
   WHITELIST_NVAPI(NvAPI_DRS_GetProfileInfo, 0x61cd6fd6);                   \
   WHITELIST_NVAPI(NvAPI_DRS_DestroySession, 0xdad9cff8);                   \
-  WHITELIST_NVAPI(NvAPI_D3D11_GetResourceGPUVirtualAddress, 0x1819b423);   \
   WHITELIST_NVAPI(NvAPI_D3D11_SetDepthBoundsTest, 0x7aaf7a04);             \
-  WHITELIST_NVAPI(NvAPI_D3D11_GetResourceGPUVirtualAddressEx, 0xaf6d14da); \
+  WHITELIST_NVAPI(NvAPI_GPU_GetAdapterIdFromPhysicalGpu, 0x0ff07fde);      \
   WHITELIST_NVAPI(NvAPI_D3D_GetCurrentSLIState, 0x4b708b54);               \
   WHITELIST_NVAPI(NvAPI_GPU_GetLogicalGpuInfo, 0x842b066e);                \
   WHITELIST_NVAPI(NvAPI_D3D11_IsFatbinPTXSupported, 0x6086bd93);           \
@@ -597,10 +602,12 @@ private:
   static NvAPI_Status NvAPI_D3D11_DestroyCubinComputeShader_hook(
       ID3D11Device *pDevice, NVDX_ObjectHandle hShader)
   {
+    ID3D11Device *dev = NULL;
+    HRESULT hr = pDevice->QueryInterface(__uuidof(ID3D11Device), (void **)&dev);
     WrappedCubinShader *wrappedShader = (WrappedCubinShader *)hShader;
-    NvAPI_Status status = nvhooks.NvAPI_D3D11_DestroyCubinComputeShader()(pDevice, wrappedShader->real());
+    NvAPI_Status status = nvhooks.NvAPI_D3D11_DestroyCubinComputeShader()(dev, wrappedShader->real());
     INVAPID3DDevice *nvapiDev = NULL;
-    HRESULT hr = pDevice->QueryInterface(__uuidof(INVAPID3DDevice), (void **)&nvapiDev);
+    hr = pDevice->QueryInterface(__uuidof(INVAPID3DDevice), (void **)&nvapiDev);
     nvapiDev->D3D11_DestroyCubinComputeShader(hShader);
     (void)hr;
     return status;
@@ -611,10 +618,12 @@ private:
       NvU32 blockX, NvU32 blockY, NvU32 blockZ,
       NVDX_ObjectHandle* phShader)
   {
-    NvAPI_Status status = nvhooks.NvAPI_D3D11_CreateCubinComputeShader()(pDevice, pCubin, size,
+    ID3D11Device *dev = NULL;
+    HRESULT hr = pDevice->QueryInterface(__uuidof(ID3D11Device), (void **)&dev);
+    NvAPI_Status status = nvhooks.NvAPI_D3D11_CreateCubinComputeShader()(dev, pCubin, size,
                                                                          blockX, blockY, blockZ, phShader);
     INVAPID3DDevice *nvapiDev = NULL;
-    HRESULT hr = pDevice->QueryInterface(__uuidof(INVAPID3DDevice), (void **)&nvapiDev);
+    hr = pDevice->QueryInterface(__uuidof(INVAPID3DDevice), (void **)&nvapiDev);
     nvapiDev->D3D11_CreateCubinComputeShader(pCubin, size, blockX, blockY, blockZ, nullptr, phShader);
     (void)hr;
     return status;
@@ -626,10 +635,12 @@ private:
                                                                 NvU32 dynSharedMemBytes, const char *pShaderName,
                                                                 NVDX_ObjectHandle *phShader)
   {
+    ID3D11Device *dev = NULL;
+    HRESULT hr = pDevice->QueryInterface(__uuidof(ID3D11Device), (void **)&dev);
     NvAPI_Status status = nvhooks.NvAPI_D3D11_CreateCubinComputeShaderEx()(
-        pDevice, pCubin, size, blockX, blockY, blockZ, dynSharedMemBytes, pShaderName, phShader);
+        dev, pCubin, size, blockX, blockY, blockZ, dynSharedMemBytes, pShaderName, phShader);
     INVAPID3DDevice *nvapiDev = NULL;
-    HRESULT hr = pDevice->QueryInterface(__uuidof(INVAPID3DDevice), (void **)&nvapiDev);
+    hr = pDevice->QueryInterface(__uuidof(INVAPID3DDevice), (void **)&nvapiDev);
     nvapiDev->D3D11_CreateCubinComputeShader(pCubin, size, blockX, blockY, blockZ, pShaderName, phShader);
     (void)hr;
     return status;
@@ -639,10 +650,12 @@ private:
       ID3D11Device *pDevice, const void *pCubin, NvU32 size, NvU32 blockX, NvU32 blockY,
       NvU32 blockZ, const char *pShaderName, NVDX_ObjectHandle *phShader)
   {
+    ID3D11Device *dev = NULL;
+    HRESULT hr = pDevice->QueryInterface(__uuidof(ID3D11Device), (void **)&dev);
     NvAPI_Status status = nvhooks.NvAPI_D3D11_CreateCubinComputeShaderWithName()(
-        pDevice, pCubin, size, blockX, blockY, blockZ, pShaderName, phShader);
+        dev, pCubin, size, blockX, blockY, blockZ, pShaderName, phShader);
     INVAPID3DDevice *nvapiDev = NULL;
-    HRESULT hr = pDevice->QueryInterface(__uuidof(INVAPID3DDevice), (void **)&nvapiDev);
+    hr = pDevice->QueryInterface(__uuidof(INVAPID3DDevice), (void **)&nvapiDev);
     //char fileName[512] = {0};
     //snprintf(fileName, 512, "%s.cubin", pShaderName);
     //FILE *file = nullptr;
@@ -661,10 +674,15 @@ private:
       ID3D11SamplerState** ppSamplerState,
       NvU32* pDriverHandle)
   {
-    NvAPI_Status status = nvhooks.NvAPI_D3D11_CreateSamplerState()(pDevice, pSamplerDesc,
+    ID3D11Device *dev = NULL;
+    HRESULT hr = pDevice->QueryInterface(__uuidof(ID3D11Device), (void **)&dev);
+    ScopedSuppressHooking suppress;
+    bHookD3D11CreateSampler = false;
+    NvAPI_Status status = nvhooks.NvAPI_D3D11_CreateSamplerState()(dev, pSamplerDesc,
                                                                    ppSamplerState, pDriverHandle);
+    bHookD3D11CreateSampler = true;
     INVAPID3DDevice *nvapiDev = NULL;
-    HRESULT hr = pDevice->QueryInterface(__uuidof(INVAPID3DDevice), (void **)&nvapiDev);
+    hr = pDevice->QueryInterface(__uuidof(INVAPID3DDevice), (void **)&nvapiDev);
     nvapiDev->D3D11_CreateSamplerState(pSamplerDesc, ppSamplerState, (uint32_t*)pDriverHandle);
     (void)hr;
     return status;
@@ -676,50 +694,101 @@ private:
       NvU32 samplerDriverHandle,
       NvU32* pCudaTextureHandle)
   {
+    ID3D11Device *dev = NULL;
+    HRESULT hr = pDevice->QueryInterface(__uuidof(ID3D11Device), (void **)&dev);
     NvAPI_Status status = nvhooks.NvAPI_D3D11_GetCudaTextureObject()(
-        pDevice, srvDriverHandle, samplerDriverHandle, pCudaTextureHandle);
+        dev, srvDriverHandle, samplerDriverHandle, pCudaTextureHandle);
     INVAPID3DDevice *nvapiDev = NULL;
-    HRESULT hr = pDevice->QueryInterface(__uuidof(INVAPID3DDevice), (void **)&nvapiDev);
+    hr = pDevice->QueryInterface(__uuidof(INVAPID3DDevice), (void **)&nvapiDev);
     nvapiDev->D3D11_GetCudaTextureObject(srvDriverHandle, samplerDriverHandle, (uint32_t *)pCudaTextureHandle);
     (void)hr;
     return status;
   }
 
   static NvAPI_Status NvAPI_D3D11_CreateShaderResourceView_hook(
-      ID3D11Device* pDevice, ID3D11Resource* pResource,
-      const D3D11_SHADER_RESOURCE_VIEW_DESC* pDesc, 
-      ID3D11ShaderResourceView** ppSRV,
-      NvU32* pDriverHandle)
+      ID3D11Device *pDevice, ID3D11Resource *pResource, const D3D11_SHADER_RESOURCE_VIEW_DESC *pDesc,
+      ID3D11ShaderResourceView **ppSRV, NvU32 *pDriverHandle)
   {
-    NvAPI_Status status = nvhooks.NvAPI_D3D11_CreateShaderResourceView()(pDevice, pResource, pDesc,
-                                                                         ppSRV, pDriverHandle);
+    ID3D11Device *dev = NULL;
+    HRESULT hr = pDevice->QueryInterface(__uuidof(ID3D11Device), (void **)&dev);
+    ScopedSuppressHooking suppress;
+    bHookD3D11CreateSRV = false;
+    NvAPI_Status status = nvhooks.NvAPI_D3D11_CreateShaderResourceView()(
+        dev, UnwrapResource(pResource), pDesc, ppSRV, pDriverHandle);
+    bHookD3D11CreateSRV = true;
     INVAPID3DDevice *nvapiDev = NULL;
-    HRESULT hr = pDevice->QueryInterface(__uuidof(INVAPID3DDevice), (void **)&nvapiDev);
+    hr = pDevice->QueryInterface(__uuidof(INVAPID3DDevice), (void **)&nvapiDev);
     nvapiDev->D3D11_CreateShaderResourceView(pResource, pDesc, ppSRV, (uint32_t *)pDriverHandle);
     (void)hr;
     return status;
   }
 
   static NvAPI_Status NvAPI_D3D11_CreateUnorderedAccessView_hook(
-      ID3D11Device* pDevice,
-      ID3D11Resource* pResource,
-      const D3D11_UNORDERED_ACCESS_VIEW_DESC* pDesc,
-      ID3D11UnorderedAccessView** ppUAV,
-      NvU32* pDriverHandle)
+      ID3D11Device *pDevice, ID3D11Resource *pResource, const D3D11_UNORDERED_ACCESS_VIEW_DESC *pDesc,
+      ID3D11UnorderedAccessView **ppUAV, NvU32 *pDriverHandle)
   {
-    NvAPI_Status status = nvhooks.NvAPI_D3D11_CreateUnorderedAccessView()(pDevice, pResource, pDesc,
-                                                                         ppUAV, pDriverHandle);
+    ID3D11Device *dev = NULL;
+    HRESULT hr = pDevice->QueryInterface(__uuidof(ID3D11Device), (void **)&dev);
+    ScopedSuppressHooking suppress;
+    bHookD3D11CreateUAV = false;
+    NvAPI_Status status = nvhooks.NvAPI_D3D11_CreateUnorderedAccessView()(
+        dev, UnwrapResource(pResource), pDesc, ppUAV, pDriverHandle);
+    bHookD3D11CreateUAV = true;
+    INVAPID3DDevice *nvapiDev = NULL;
+    hr = pDevice->QueryInterface(__uuidof(INVAPID3DDevice), (void **)&nvapiDev);
+    nvapiDev->D3D11_CreateUnorderedAccessView(pResource, pDesc, ppUAV, (uint32_t *)pDriverHandle);
+    (void)hr;
     return status;
   }
 
   static NvAPI_Status NvAPI_D3D11_GetResourceHandle_hook(ID3D11Device *pDevice,
-      ID3D11Resource *pResource,
-      NVDX_ObjectHandle *phObject)
+                                                         ID3D11Resource *pResource,
+                                                         NVDX_ObjectHandle *phObject)
   {
-    NvAPI_Status status = nvhooks.NvAPI_D3D11_GetResourceHandle()(pDevice, pResource, phObject);
+    ID3D11Device *dev = NULL;
+    HRESULT hr = pDevice->QueryInterface(__uuidof(ID3D11Device), (void **)&dev);
+    NvAPI_Status status =
+        nvhooks.NvAPI_D3D11_GetResourceHandle()(dev, UnwrapResource(pResource), phObject);
     INVAPID3DDevice *nvapiDev = NULL;
-    HRESULT hr = pDevice->QueryInterface(__uuidof(INVAPID3DDevice), (void **)&nvapiDev);
+    hr = pDevice->QueryInterface(__uuidof(INVAPID3DDevice), (void **)&nvapiDev);
     nvapiDev->D3D11_GetResourceHandle(pResource, phObject);
+    (void)hr;
+    return status;
+  }
+
+  static NvAPI_Status NvAPI_D3D11_GetResourceGPUVirtualAddressEx_hook(
+      ID3D11Device *pDevice, NV_GET_GPU_VIRTUAL_ADDRESS *pParams)
+  {
+    ID3D11Device *dev = NULL;
+    HRESULT hr = pDevice->QueryInterface(__uuidof(ID3D11Device), (void **)&dev);
+    NvAPI_Status status = nvhooks.NvAPI_D3D11_GetResourceGPUVirtualAddressEx()(dev, pParams);
+    INVAPID3DDevice *nvapiDev = NULL;
+    hr = pDevice->QueryInterface(__uuidof(INVAPID3DDevice), (void **)&nvapiDev);
+    NvGetGpuVa param = {
+        pParams->hResource,
+        pParams->gpuVAStart,
+        pParams->gpuVASize,
+    };
+    nvapiDev->D3D11_GetResourceGpuVa(&param);
+    (void)hr;
+    return status;
+  }
+
+  static NvAPI_Status NvAPI_D3D11_GetResourceGPUVirtualAddress_hook(
+      ID3D11Device *pDevice, const NVDX_ObjectHandle hResource,
+      NvU64* pGpuVA)
+  {
+    ID3D11Device *dev = NULL;
+    HRESULT hr = pDevice->QueryInterface(__uuidof(ID3D11Device), (void **)&dev);
+    NvAPI_Status status = nvhooks.NvAPI_D3D11_GetResourceGPUVirtualAddress()(dev, hResource, pGpuVA);
+    INVAPID3DDevice *nvapiDev = NULL;
+    hr = pDevice->QueryInterface(__uuidof(INVAPID3DDevice), (void **)&nvapiDev);
+    NvGetGpuVa param = {
+        hResource,
+        *pGpuVA,
+        0,
+    };
+    nvapiDev->D3D11_GetResourceGpuVa(&param);
     (void)hr;
     return status;
   }

@@ -89,6 +89,7 @@ enum class NvShaderAtomic : uint8_t
 
 struct D3D12_GRAPHICS_PIPELINE_STATE_DESC;
 struct D3D12_COMPUTE_PIPELINE_STATE_DESC;
+struct NvGetGpuVa;
 interface ID3D12PipelineState;
 
 MIDL_INTERFACE("DA122FC2-0F60-4904-AEA4-5ED1D2E1D19F")
@@ -143,6 +144,11 @@ INVAPID3DDevice : public IUnknown
 
   virtual _NvAPI_Status STDMETHODCALLTYPE D3D11_GetResourceHandle(
       ID3D11Resource * pResource, NVDX_ObjectHandle__* * phObject)
+  {
+    return (_NvAPI_Status)-3;
+  }
+
+  virtual _NvAPI_Status STDMETHODCALLTYPE D3D11_GetResourceGpuVa(NvGetGpuVa* param)
   {
     return (_NvAPI_Status)-3;
   }

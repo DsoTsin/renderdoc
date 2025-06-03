@@ -736,6 +736,64 @@ WrappedID3DDeviceContextState::~WrappedID3DDeviceContextState()
   }
 }
 
+#include "elfio/elfio.hpp"
+#include "lz4/lz4.h"
+
+#define EIATTR_MIN_STACK_SIZE 0x1204
+
+// Constants for attributes defined in .nv.info.<func_name> sections
+// along with their size in increments of 32-bit word (section is .align 4)
+#define EIATTR_CUDA_API_VERSION 0x3704
+#define EIATTR_CUDA_API_VERSION_ATTR_WORD_LEN 2
+
+#define EIATTR_CRS_STACK_SIZE 0x1e04
+#define EIATTR_CRS_STACK_SIZE_ATTR_WORD_LEN 2
+
+#define EIATTR_PARAM_CBANK 0x0a04
+#define EIATTR_PARAM_CBANK_ATTR_WORD_LEN 3
+
+#define EIATTR_CBANK_PARAM_SIZE 0x1903
+#define EIATTR_CBANK_PARAM_SIZE_ATTR_WORD_LEN 1
+
+#define EIATTR_KPARAM_INFO 0x1704
+#define EIATTR_KPARAM_INFO_ATTR_WORD_LEN 4
+
+#define EIATTR_MAXREG_COUNT 0x1b03
+#define EIATTR_MAXREG_COUNT_ATTR_WORD_LEN 1
+
+#define EIATTR_COOP_GROUP_MASK_REGIDS 0x2904
+#define EIATTR_COOP_GROUP_MASK_REGIDS_ATTR_WORD_LEN 1
+
+#define EIATTR_EXIT_INSTR_OFFSETS 0x1c04
+#define EIATTR_EXIT_INSTR_OFFSETS_ATTR_WORD_LEN 4
+
+#define EIATTR_SW2861232_WAR 0x3501
+#define EIATTR_SW2861232_WAR_ATTR_WORD_LEN 1
+
+#define EIATTR_SW2393858_WAR 0x3001
+#define EIATTR_SW2393858_WAR_ATTR_WORD_LEN 1
+
+#define EIATTR_SW1850030_WAR 0x2a01
+#define EIATTR_SW1850030_WAR_ATTR_WORD_LEN 1
+
+#define EIATTR_SW_WAR 0x3604
+#define EIATTR_SW_WAR_ATTR_WORD_LEN 2
+
+#define EIATTR_S2RCTAID_INSTR_OFFSETS 0x1d04
+#define EIATTR_S2RCTAID_INSTR_OFFSETS_ATTR_BASE_WORD_LEN 1
+
+#define EIATTR_EXTERNS 0x0f04
+#define EIATTR_EXTERNS_ATTR_WORD_LEN 2
+
+#define EIATTR_SYSCALL_OFFSETS 0x4604
+#define EIATTR_SYSCALL_OFFSETS_ATTR_WORD_LEN 2
+
+PACK(struct FatBinPTX
+{
+  uint32_t ptxasOptions;    // const char*
+  uint32_t ptxasOptionsSize;
+});
+
 WrappedCubinShader::WrappedCubinShader(NVDX_ObjectHandle__ *real, ResourceId origId, const byte *code,
                                        size_t codeLen, const char *name, uint32_t blkx,
                                        uint32_t blky, uint32_t blkz, WrappedID3D11Device *device)
@@ -754,7 +812,25 @@ WrappedCubinShader::WrappedCubinShader(NVDX_ObjectHandle__ *real, ResourceId ori
   {
     m_ID = origId;
   }
-  // bool ret = m_pDevice->GetResourceManager()->AddWrapper(this, real);
+  const byte *end = code + codeLen;
+    FatBinHeader *header = (FatBinHeader *)code;
+  const byte *ptr = nullptr;
+  if(header->magic == FATBIN_TEXT_MAGIC)
+  {
+    ptr = code + header->header_size;
+    while (ptr != end)
+    {
+      FatCodeHeader *cHeader = (FatCodeHeader *)ptr;
+      m_FatCodes.push_back(*cHeader);
+      if (cHeader->kind == FatBinKind::ELF)
+      {
 
-  // m_pDevice->GetResourceManager()->AddCurrentResource(m_ResourceId, this);
+      }
+      else if (cHeader->kind == FatBinKind::PTX)
+      {
+
+      }
+      ptr += cHeader->header_size + cHeader->size;
+    }
+  }
 }

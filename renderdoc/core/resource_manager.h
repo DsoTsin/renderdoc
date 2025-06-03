@@ -1888,7 +1888,7 @@ void ResourceManager<Configuration>::AddLiveVendorResource(ResourceId origid, IV
 
   if(origid == ResourceId() || livePtr == nullptr)
   {
-    RDCERR("Invalid state adding resource mapping - id is invalid or live pointer is NULL");
+    //RDCERR("Invalid state adding resource mapping - id is invalid or live pointer is NULL");
   }
 
   m_OriginalIDs[livePtr->GetResourceID()] = origid;
@@ -1896,7 +1896,7 @@ void ResourceManager<Configuration>::AddLiveVendorResource(ResourceId origid, IV
 
   if(m_LiveVendorResourceMap.find(origid) != m_LiveVendorResourceMap.end())
   {
-    RDCERR("Releasing live vendor resource for duplicate creation: %s", ToStr(origid).c_str());
+    //RDCERR("Releasing live vendor resource for duplicate creation: %s", ToStr(origid).c_str());
     //ResourceTypeRelease(m_LiveVendorResourceMap[origid]);
     m_LiveVendorResourceMap.erase(origid);
   }

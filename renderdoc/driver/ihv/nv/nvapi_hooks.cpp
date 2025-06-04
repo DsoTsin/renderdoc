@@ -216,8 +216,20 @@ private:
   WHITELIST_NVAPI(NvAPI_D3D_GetCurrentSLIState, 0x4b708b54);               \
   WHITELIST_NVAPI(NvAPI_GPU_GetLogicalGpuInfo, 0x842b066e);                \
   WHITELIST_NVAPI(NvAPI_D3D11_IsFatbinPTXSupported, 0x6086bd93);           \
-  WHITELIST_NVAPI(NvAPI_D3D1x_GetGraphicsCapabilities, 0x52b1499a);        \
-  WHITELIST_NVAPI(NvAPI_EnumPhysicalGPUs, 0xe5ac921f);                     \
+  WHITELIST_NVAPI(NvAPI_D3D12_IsFatbinPTXSupported, 0x70c07832);             \
+  WHITELIST_NVAPI(NvAPI_D3D12_CreateCubinComputeShaderWithName, 0x1dc7261f); \
+  WHITELIST_NVAPI(NvAPI_D3D12_CreateCubinComputeShaderEx, 0x3151211b);       \
+  WHITELIST_NVAPI(NvAPI_D3D12_CreateCubinComputeShader, 0x2a2c79e8);         \
+  WHITELIST_NVAPI(NvAPI_D3D12_CreateCubinComputeShaderExV2, 0x299f5fdc);     \
+  WHITELIST_NVAPI(NvAPI_D3D12_LaunchCubinShader, 0x5c52bb86);                \
+  WHITELIST_NVAPI(NvAPI_D3D12_DestroyCubinComputeShader, 0x7fb785ba);        \
+  WHITELIST_NVAPI(NvAPI_D3D12_CreateCuModule, 0xad1a677d);                   \
+  WHITELIST_NVAPI(NvAPI_D3D12_EnumFunctionsInModule, 0x7ab88d88);            \
+  WHITELIST_NVAPI(NvAPI_D3D12_CreateCuFunction, 0xe2436e22);                 \
+  WHITELIST_NVAPI(NvAPI_D3D12_LaunchCuKernelChain, 0x24973538);              \
+  WHITELIST_NVAPI(NvAPI_D3D12_LaunchCuKernelChainEx, 0x846a9bf0);            \
+  WHITELIST_NVAPI(NvAPI_D3D1x_GetGraphicsCapabilities, 0x52b1499a);          \
+  WHITELIST_NVAPI(NvAPI_EnumPhysicalGPUs, 0xe5ac921f);                       \
   WHITELIST_NVAPI(NvAPI_GetInterfaceVersionString, 0x01053fa5);
 
   NVAPI_FUNCS();

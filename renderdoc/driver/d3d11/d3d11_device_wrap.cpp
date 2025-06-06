@@ -4407,7 +4407,7 @@ _NvAPI_Status WrappedID3D11Device::NvCreateUnorderedAccessView(
   {
     USE_SCRATCH_SERIALISER();
     SCOPED_SERIALISE_CHUNK(D3D11Chunk::NvApi_CreateUAV);
-    Serialise_NvCreateUnorderedAccessView(ser, pResource, pDesc, ppUAV, pDriverHandle);
+    Serialise_NvCreateUnorderedAccessView(ser, pResource, pDesc, &wrapped, pDriverHandle);
     chunk = scope.Get();
     D3D11ResourceRecord *parent =
         GetResourceManager()->GetResourceRecord(GetIDForDeviceChild(pResource));

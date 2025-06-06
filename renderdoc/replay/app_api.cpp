@@ -317,7 +317,7 @@ void Init_1_6_0()
   api.SetCaptureTitle = &SetCaptureTitle;
 }
 
-extern "C" RENDERDOC_API int RENDERDOC_CC RENDERDOC_GetAPI(RENDERDOC_Version version,
+extern "C" RENDERDOC_API int RENDERDOC_CC RENDERDOG_GetAPI(RENDERDOC_Version version,
                                                            void **outAPIPointers)
 {
   if(outAPIPointers == NULL)

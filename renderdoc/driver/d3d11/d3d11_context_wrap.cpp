@@ -5164,7 +5164,7 @@ bool WrappedID3D11DeviceContext::Serialise_LaunchCubinShader(
     CubinParser parser(cubinShader);
     parser.parse();
     NvAPI_D3D11_LaunchCubinShader(m_pRealContext, cubinShader->real(), gridX, gridY, gridZ, pParams,
-                                  paramSize,
+                                  paramSize_,
                                   (const NVDX_ObjectHandle *)pReadResources, numReadResources,
                                   (const NVDX_ObjectHandle *)pWriteResources, numWriteResources);
 

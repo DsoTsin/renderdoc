@@ -42,10 +42,10 @@
 #include "stb/stb_image_resize2.h"
 
 // {5D6BF029-A6BA-417A-8523-120492B1DCE3}
-static const GUID CLSID_RDCThumbnailProvider = {0x5d6bf029,
+static const GUID CLSID_RDCThumbnailProvider = {0x5d6be129,
                                                 0xa6ba,
                                                 0x417a,
-                                                {0x85, 0x23, 0x12, 0x4, 0x92, 0xb1, 0xdc, 0xe3}};
+                                                {0x85, 0x23, 0x12, 0x4, 0x92, 0xb1, 0xac, 0xe3}};
 
 unsigned int numProviders = 0;
 

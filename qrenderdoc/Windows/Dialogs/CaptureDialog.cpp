@@ -488,12 +488,12 @@ void CaptureDialog::vulkanLayerWarn_mouseClick()
 
       if(admin)
       {
-// linux sometimes can't run GUI apps as root, so we have to run renderdoccmd. Check that it's
+// linux sometimes can't run GUI apps as root, so we have to run renderdogcmd. Check that it's
 // installed, error if not, then invoke it.
 #if defined(Q_OS_LINUX) || defined(Q_OS_FREEBSD)
         QDir binDir = QFileInfo(qApp->applicationFilePath()).absoluteDir();
 
-        QString cmd = lit("renderdoccmd");
+        QString cmd = lit("renderdogcmd");
 
         if(binDir.exists(cmd))
         {
@@ -507,10 +507,10 @@ void CaptureDialog::vulkanLayerWarn_mouseClick()
           if(inPath.isEmpty())
           {
             RDDialog::critical(
-                this, tr("Can't locate renderdoccmd"),
-                tr("On linux we must run renderdoccmd as root to register the layer, because "
+                this, tr("Can't locate renderdogcmd"),
+                tr("On linux we must run renderdogcmd as root to register the layer, because "
                    "graphical applications like qrenderdoc may fail to launch.\n\n"
-                   "renderdoccmd could not be located either next to this qrenderdoc executable or "
+                   "renderdogcmd could not be located either next to this qrenderdoc executable or "
                    "in PATH."));
             return;
           }
@@ -518,16 +518,16 @@ void CaptureDialog::vulkanLayerWarn_mouseClick()
           // it's in the path, we can continue
         }
 
-        QStringList renderdoccmdParams;
+        QStringList renderdogcmdParams;
 
-        renderdoccmdParams << lit("vulkanlayer");
-        renderdoccmdParams << lit("--register");
+        renderdogcmdParams << lit("vulkanlayer");
+        renderdogcmdParams << lit("--register");
         if(system)
-          renderdoccmdParams << lit("--system");
+          renderdogcmdParams << lit("--system");
         else
-          renderdoccmdParams << lit("--user");
+          renderdogcmdParams << lit("--user");
 
-        if(!RunProcessAsAdmin(cmd, renderdoccmdParams, this, true, regComplete))
+        if(!RunProcessAsAdmin(cmd, renderdogcmdParams, this, true, regComplete))
           regComplete();
 #else
         QStringList qrenderdocParams;

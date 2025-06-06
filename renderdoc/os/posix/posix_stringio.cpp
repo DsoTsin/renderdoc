@@ -151,7 +151,7 @@ rdcstr GetReplayAppFilename()
   dladdr((void *)&soLocator, &info);
   rdcstr path = info.dli_fname ? info.dli_fname : "";
   path = get_dirname(path);
-  rdcstr replay = path + "/qrenderdoc";
+  rdcstr replay = path + "/qrenderdog";
 
   FILE *f = FileIO::fopen(replay, FileIO::ReadText);
   if(f)
@@ -171,7 +171,7 @@ rdcstr GetReplayAppFilename()
 #endif
 
   // leave the lib/ folder, and go into bin/
-  replay += "../bin/qrenderdoc";
+  replay += "../bin/qrenderdog";
 
   f = FileIO::fopen(replay, FileIO::ReadText);
   if(f)
@@ -195,7 +195,7 @@ rdcstr GetReplayAppFilename()
   }
 
   // out of ideas, just return the filename and hope it's in PATH
-  return "qrenderdoc";
+  return "qrenderdog";
 }
 
 void GetDefaultFiles(const rdcstr &logBaseName, rdcstr &capture_filename, rdcstr &logging_filename,

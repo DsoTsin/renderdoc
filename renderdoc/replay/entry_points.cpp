@@ -552,7 +552,7 @@ extern "C" RENDERDOC_API void RENDERDOC_CC RENDERDOC_StartSelfHostCapture(const 
     return;
 
   pRENDERDOC_GetAPI get =
-      (pRENDERDOC_GetAPI)Process::GetFunctionAddress(module, "RENDERDOC_GetAPI");
+      (pRENDERDOC_GetAPI)Process::GetFunctionAddress(module, "RENDERDOG_GetAPI");
 
   if(get == NULL)
     return;
@@ -578,7 +578,7 @@ extern "C" RENDERDOC_API void RENDERDOC_CC RENDERDOC_EndSelfHostCapture(const rd
     return;
 
   pRENDERDOC_GetAPI get =
-      (pRENDERDOC_GetAPI)Process::GetFunctionAddress(module, "RENDERDOC_GetAPI");
+      (pRENDERDOC_GetAPI)Process::GetFunctionAddress(module, "RENDERDOG_GetAPI");
 
   if(get == NULL)
     return;

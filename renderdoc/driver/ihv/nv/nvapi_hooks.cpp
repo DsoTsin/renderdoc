@@ -217,6 +217,9 @@ private:
   WHITELIST_NVAPI(NvAPI_GPU_GetLogicalGpuInfo, 0x842b066e);                \
   WHITELIST_NVAPI(NvAPI_D3D11_IsFatbinPTXSupported, 0x6086bd93);           \
   WHITELIST_NVAPI(NvAPI_D3D12_IsFatbinPTXSupported, 0x70c07832);             \
+  WHITELIST_NVAPI(NvAPI_D3D12_GetCudaSurfaceObject, 0x48f5b2ee);             \
+  WHITELIST_NVAPI(NvAPI_D3D12_GetCudaTextureObject, 0x80403fc9);             \
+  WHITELIST_NVAPI(NvAPI_D3D12_NotifyOutOfBandCommandQueue, 0x03d6e8cb);      \
   WHITELIST_NVAPI(NvAPI_D3D12_CreateCubinComputeShaderWithName, 0x1dc7261f); \
   WHITELIST_NVAPI(NvAPI_D3D12_CreateCubinComputeShaderEx, 0x3151211b);       \
   WHITELIST_NVAPI(NvAPI_D3D12_CreateCubinComputeShader, 0x2a2c79e8);         \
@@ -229,6 +232,13 @@ private:
   WHITELIST_NVAPI(NvAPI_D3D12_LaunchCuKernelChain, 0x24973538);              \
   WHITELIST_NVAPI(NvAPI_D3D12_LaunchCuKernelChainEx, 0x846a9bf0);            \
   WHITELIST_NVAPI(NvAPI_D3D1x_GetGraphicsCapabilities, 0x52b1499a);          \
+  WHITELIST_NVAPI(NvAPI_D3D_SetReflexSync, 0xb9f6faff);                      \
+  WHITELIST_NVAPI(NvAPI_D3D_GetLatency, 0x1a587f9c);                         \
+  WHITELIST_NVAPI(NvAPI_D3D_SetLatencyMarker, 0xd9984c05);                   \
+  WHITELIST_NVAPI(NvAPI_D3D12_SetAsyncFrameMarker, 0x13c98f73);              \
+  WHITELIST_NVAPI(NvAPI_D3D_SetSleepMode, 0xac1ca9e0);                       \
+  WHITELIST_NVAPI(NvAPI_D3D_GetSleepStatus, 0xaef96ca1);                     \
+  WHITELIST_NVAPI(NvAPI_D3D_Sleep, 0x852cd1d2);                              \
   WHITELIST_NVAPI(NvAPI_EnumPhysicalGPUs, 0xe5ac921f);                       \
   WHITELIST_NVAPI(NvAPI_GetInterfaceVersionString, 0x01053fa5);
 

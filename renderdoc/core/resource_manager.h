@@ -591,6 +591,10 @@ public:
   // while capturing or replaying, resources and their live IDs
   void AddCurrentResource(ResourceId id, WrappedResourceType res);
   bool HasCurrentResource(ResourceId id);
+
+  void AddCurrentResourceWithDriverHandle(ResourceId id, uint32_t drvHandle, WrappedResourceType res);
+  bool GetResourceIdByDriverHandle(uint32_t drvHandle, ResourceId &id) const;
+
   WrappedResourceType GetCurrentResource(ResourceId id);
   void ReleaseCurrentResource(ResourceId id);
 
@@ -691,6 +695,19 @@ public:
   bool ShouldPostpone(ResourceId id);
   bool ShouldSkip(ResourceId id);
 
+  struct TextureCombo
+  {
+    ResourceId Srv;
+    ResourceId Sampler;
+  };
+  std::map<uint32_t, TextureCombo> m_TextureObjectHandleMap;
+  std::map<uint32_t, uint32_t> m_ViewHandleMap;
+  std::map<uint32_t, ResourceId> m_ViewHandleToIdMap;
+
+  std::map<uint32_t, uint32_t> m_TextureObjectToNewTextureObjectMap;
+  std::map<uint64_t, std::pair<ResourceId,uint64_t>> m_GpuAddressToIdMap;
+  std::map<uint64_t, std::pair<uint64_t,uint64_t>> m_GpuAddressToNewAddressMap;
+
   virtual bool IsResourceTrackedForPersistency(const WrappedResourceType &res) { return false; }
 protected:
   friend InitialContentData;
@@ -733,6 +750,7 @@ protected:
   // used during capture - map from real resource to its wrapper (other way can be done just with an
   // Unwrap)
   std::map<RealResourceType, WrappedResourceType> m_WrapperMap;
+  std::map<uint32_t, ResourceId> m_DriverHandleMap;
 
   // used during capture - holds resources referenced in current frame (and how they're referenced)
   std::unordered_map<ResourceId, FrameRefType> m_FrameReferencedResources;
@@ -1998,6 +2016,31 @@ void ResourceManager<Configuration>::AddCurrentResource(ResourceId id, WrappedRe
 }
 
 template <typename Configuration>
+void ResourceManager<Configuration>::AddCurrentResourceWithDriverHandle(ResourceId id,
+                                                                        uint32_t drvHandle,
+                                                                        WrappedResourceType res)
+{
+  SCOPED_LOCK_OPTIONAL(m_Lock, m_Capturing);
+  m_CurrentResourceMap[id] = res;
+  if (drvHandle != ~0u)
+  {
+    m_DriverHandleMap[drvHandle] = id;
+  }
+}
+
+template <typename Configuration>
+bool ResourceManager<Configuration>::GetResourceIdByDriverHandle(uint32_t drvHandle, ResourceId& id) const
+{
+  auto iter = m_DriverHandleMap.find(drvHandle);
+  bool found = iter != m_DriverHandleMap.end();
+  if (found)
+  {
+    id = iter->second;
+  }
+  return found;
+}
+
+template <typename Configuration>
 bool ResourceManager<Configuration>::HasCurrentResource(ResourceId id)
 {
   SCOPED_LOCK_OPTIONAL(m_Lock, m_Capturing);
@@ -2032,6 +2075,8 @@ void ResourceManager<Configuration>::ReleaseCurrentResource(ResourceId id)
 
   m_CurrentResourceMap.erase(id);
   m_DirtyResources.erase(id);
+
+  //m_DriverHandleMap.erase(id);
 
   auto it = std::lower_bound(m_ResourceRefTimes.begin(), m_ResourceRefTimes.end(), id);
   if(it != m_ResourceRefTimes.end())

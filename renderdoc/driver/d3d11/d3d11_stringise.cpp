@@ -215,7 +215,7 @@ rdcstr DoStringise(const D3D11Chunk &el)
     STRINGISE_ENUM_CLASS_NAMED(SetShaderExtUAV, "VendorExtension::SetExtensionUAVSlot");
 
     STRINGISE_ENUM_CLASS_NAMED(NvApi_CreateCubinShader, "Nv::CreateCubinShader");
-    STRINGISE_ENUM_CLASS_NAMED(NvApi_LaunchCubinShader, "Nv::LaunchCubinShader");
+    STRINGISE_ENUM_CLASS_NAMED(NvApi_LaunchCubinShader, "Nv::Dispatch(NV)");
     STRINGISE_ENUM_CLASS_NAMED(NvApi_DestroyCubinShader, "Nv::DestroyCubinShader");
     STRINGISE_ENUM_CLASS_NAMED(NvApi_CreateSamplerState, "Nv::CreateSamplerState");
     STRINGISE_ENUM_CLASS_NAMED(NvApi_CreateSRV, "Nv::CreateShaderResourceView");
@@ -420,6 +420,18 @@ rdcstr DoStringise(const D3D11_COMPARISON_FUNC &el)
     STRINGISE_ENUM(D3D11_COMPARISON_NOT_EQUAL);
     STRINGISE_ENUM(D3D11_COMPARISON_GREATER_EQUAL);
     STRINGISE_ENUM(D3D11_COMPARISON_ALWAYS);
+  }
+  END_ENUM_STRINGISE();
+}
+
+template <>
+rdcstr DoStringise(const ptx_resource_type &el)
+{
+  BEGIN_ENUM_STRINGISE(ptx_resource_type);
+  {
+    STRINGISE_ENUM(ptx_resource_type_buffer);
+    STRINGISE_ENUM(ptx_resource_type_texture);
+    STRINGISE_ENUM(ptx_resource_type_surface);
   }
   END_ENUM_STRINGISE();
 }

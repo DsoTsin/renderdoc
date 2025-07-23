@@ -4287,7 +4287,7 @@ _NvAPI_Status WrappedID3D11Device::NvCreateSamplerState(const D3D11_SAMPLER_DESC
     RDCASSERT(GetResourceManager()->GetResourceRecord(id) == NULL);
     D3D11ResourceRecord *record = GetResourceManager()->AddResourceRecord(id);
     record->Length = 0;
-    m_DeviceRecord->AddChunk(scope.Get());
+    record->AddChunk(scope.Get());
   }
   *ppSamplerState = wrapped;
   return NVAPI_OK;
@@ -4305,6 +4305,7 @@ bool WrappedID3D11Device::Serialise_NvCreateShaderResourceView(
       .TypedAs("ID3D11ShaderResourceView *"_lit);
   SERIALISE_ELEMENT_LOCAL(_driverHandle,*pDriverHandle);
   SERIALISE_CHECK_READ_ERRORS();
+  D3D11ResourceManager *rm = (D3D11ResourceManager *)ser.GetUserData();
   if(IsReplayingAndReading())
   {
     ID3D11ShaderResourceView *ret;
@@ -4314,6 +4315,8 @@ bool WrappedID3D11Device::Serialise_NvCreateShaderResourceView(
     if (status == NVAPI_OK)
     {
       ret = new WrappedID3D11ShaderResourceView1(ret, pResource, this, driverHandle);
+      rm->m_ViewHandleMap[_driverHandle] = driverHandle;
+      rm->m_ViewHandleToIdMap[_driverHandle] = pView;
       GetResourceManager()->AddLiveResource(pView, ret);
       AddResource(pView, ResourceType::View, "Shader Resource View (NV)");
     }
@@ -4353,7 +4356,7 @@ _NvAPI_Status WrappedID3D11Device::NvCreateShaderResourceView(
     record->Length = 0;
 
     record->AddParent(parent);
-    m_DeviceRecord->AddChunk(chunk);
+    record->AddChunk(chunk);
   }
   *ppSRV = wrapped;
   return NVAPI_OK;
@@ -4368,7 +4371,8 @@ bool WrappedID3D11Device::Serialise_NvCreateUnorderedAccessView(
   SERIALISE_ELEMENT_OPT(pDesc).Important();
   SERIALISE_ELEMENT_LOCAL(pUAV, GetIDForDeviceChild(*ppUAV))
       .TypedAs("ID3D11ShaderResourceView *"_lit);
-  SERIALISE_ELEMENT_LOCAL(_driverHandle,*pDriverHandle);
+  SERIALISE_ELEMENT_LOCAL(_driverHandle, *pDriverHandle);
+  D3D11ResourceManager *rm = (D3D11ResourceManager *)ser.GetUserData();
   SERIALISE_CHECK_READ_ERRORS();
   if(IsReplayingAndReading())
   {
@@ -4379,7 +4383,8 @@ bool WrappedID3D11Device::Serialise_NvCreateUnorderedAccessView(
     if(status == NVAPI_OK)
     {
       ret = new WrappedID3D11UnorderedAccessView1(ret, pResource, this, driverHandle);
-
+      rm->m_ViewHandleMap[_driverHandle] = driverHandle;
+      rm->m_ViewHandleToIdMap[_driverHandle] = pUAV;
       GetResourceManager()->AddLiveResource(pUAV, ret);
     }
 
@@ -4419,7 +4424,6 @@ _NvAPI_Status WrappedID3D11Device::NvCreateUnorderedAccessView(
     record->Length = 0;
     record->AddParent(parent);
     record->AddChunk(chunk);
-    m_DeviceRecord->AddChunk(chunk);
   }
   *ppUAV = wrapped;
   return NVAPI_OK;
@@ -4431,13 +4435,20 @@ bool WrappedID3D11Device::Serialise_NvGetResourceHandle(SerialiserType &ser,
                                                         NVDX_ObjectHandle__ **phObject)
 {
   SERIALISE_ELEMENT(pResource).Important();
-  SERIALISE_ELEMENT_LOCAL(pObject, GetIDForNVDXObjectHandle(*phObject));
+  SERIALISE_ELEMENT_LOCAL(hObject, GetIDForNVDXObjectHandle(*phObject));
   if(IsReplayingAndReading())
   {
-    auto status = NvAPI_D3D11_GetResourceHandle(m_pDevice, UnwrapResource(pResource), phObject);
+    NVDX_ObjectHandle ObjectHandle;
+    auto status = NvAPI_D3D11_GetResourceHandle(m_pDevice, UnwrapResource(pResource), &ObjectHandle);
     if (status == NVAPI_OK)
     {
-
+      ((WrappedDeviceChild11<ID3D11Resource> *)pResource)->SetDriverObject((uint64_t)ObjectHandle);
+      auto ret = new WrappedNvResource(ObjectHandle, ((WrappedDeviceChild11<ID3D11Resource> *)pResource)->GetResourceID(), this);
+      GetResourceManager()->AddLiveVendorResource(ret->GetResourceID(), ret);
+    }
+    else
+    {
+      return false;
     }
   }
   return true;
@@ -4446,48 +4457,90 @@ bool WrappedID3D11Device::Serialise_NvGetResourceHandle(SerialiserType &ser,
 _NvAPI_Status WrappedID3D11Device::NvGetResourceHandle(ID3D11Resource *pResource,
                                                        NVDX_ObjectHandle__ **phObject)
 {
+  SCOPED_LOCK(m_D3DLock);
+  auto wrappedHandle = new WrappedNvResource(*phObject, GetIDForDeviceChild(pResource), this);
   if(IsCaptureMode(m_State))
   {
-    SCOPED_LOCK(m_D3DLock);
-    USE_SCRATCH_SERIALISER();
-    SCOPED_SERIALISE_CHUNK(D3D11Chunk::NvApi_GetResourceHandle);
-    Serialise_NvGetResourceHandle(ser, pResource, phObject);
-    m_DeviceRecord->AddChunk(scope.Get());
+    Chunk *chunk = nullptr;
+    {
+      USE_SCRATCH_SERIALISER();
+      SCOPED_SERIALISE_CHUNK(D3D11Chunk::NvApi_GetResourceHandle);
+      Serialise_NvGetResourceHandle(GET_SERIALISER, pResource,
+                                    (NVDX_ObjectHandle__ **)&wrappedHandle);
+      chunk = scope.Get();
+    }
+
+    D3D11ResourceRecord *record =
+        GetResourceManager()->GetResourceRecord(wrappedHandle->GetResourceID());
+    RDCASSERT(record);
+
+    record->AddChunk(chunk);
+
   }
+  else
+  {
+    GetResourceManager()->AddLiveVendorResource(wrappedHandle->GetResourceID(), wrappedHandle);
+  }
+  *phObject = (NVDX_ObjectHandle__ *)wrappedHandle;
   return NVAPI_OK;
 }
 
+#pragma optimize("",off)
 
 template <typename SerialiserType>
-bool WrappedID3D11Device::Serialise_NvGetResourceGpuVa(SerialiserType &ser, NvGetGpuVa *param)
+bool WrappedID3D11Device::Serialise_NvGetResourceGpuVa(SerialiserType &ser, NVDX_ObjectHandle__* Object, uint64_t GpuVa, uint64_t Size)
 {
-  SERIALISE_ELEMENT_LOCAL(param_, *param);
+  SERIALISE_ELEMENT_LOCAL(ObjectId, GetIDForNVDXObjectHandle(Object));
+  SERIALISE_ELEMENT_LOCAL(GpuAddr, GpuVa);
+  SERIALISE_ELEMENT(Size);
+  D3D11ResourceManager *rm = (D3D11ResourceManager *)ser.GetUserData();
   if(IsReplayingAndReading())
   {
     NV_GET_GPU_VIRTUAL_ADDRESS params = {NV_GET_GPU_VIRTUAL_ADDRESS_VER};
-    params.hResource = param_.object;   
+    auto resource = rm->GetLiveVendorResource(ObjectId);
+    (void)resource;
+    auto liveRes = (WrappedDeviceChild11<ID3D11Buffer>*)rm->GetLiveResource(ObjectId);
+    params.hResource = (NVDX_ObjectHandle)liveRes->GetDriverObject();
     auto status = NvAPI_D3D11_GetResourceGPUVirtualAddressEx(m_pDevice, &params);
     if(status == NVAPI_OK)
     {
-      param_.address = params.gpuVAStart;
-      param_.size = params.gpuVASize;
+      rm->m_GpuAddressToIdMap[GpuAddr] = {ObjectId, params.gpuVASize};
+      rm->m_GpuAddressToNewAddressMap[GpuAddr] = {params.gpuVAStart, params.gpuVASize};
     }
+    else
+    {
+      return false;
+    }
+  }
+  else
+  {
+    rm->m_GpuAddressToIdMap[GpuVa] = {ObjectId, Size};
   }
   return true;
 }
 
-_NvAPI_Status WrappedID3D11Device::NvGetResourceGpuVa(NvGetGpuVa *param)
+_NvAPI_Status WrappedID3D11Device::NvGetResourceGpuVa(NVDX_ObjectHandle__* Object, uint64_t GpuVa, uint64_t Size)
 {
   if(IsCaptureMode(m_State))
   {
+    Chunk *chunk = nullptr;
+
     SCOPED_LOCK(m_D3DLock);
-    USE_SCRATCH_SERIALISER();
-    SCOPED_SERIALISE_CHUNK(D3D11Chunk::NvApi_GetResourceGpuVa);
-    Serialise_NvGetResourceGpuVa(ser, param);
-    m_DeviceRecord->AddChunk(scope.Get());
+    {
+      USE_SCRATCH_SERIALISER();
+      SCOPED_SERIALISE_CHUNK(D3D11Chunk::NvApi_GetResourceGpuVa);
+      Serialise_NvGetResourceGpuVa(ser, Object, GpuVa, Size);
+      chunk = scope.Get();
+    }
+    auto resId = ((WrappedNvResource *)Object)->GetResourceID();
+    D3D11ResourceRecord *record = GetResourceManager()->GetResourceRecord(resId);
+    RDCASSERT(record);
+    record->AddChunk(chunk);
   }
   return NVAPI_OK;
 }
+
+#pragma optimize("", on)
 
 template <typename SerialiserType>
 bool WrappedID3D11Device::Serialise_NvGetCudaTextureObject(SerialiserType &ser,
@@ -4496,16 +4549,36 @@ bool WrappedID3D11Device::Serialise_NvGetCudaTextureObject(SerialiserType &ser,
                                                            uint32_t *pCudaTextureHandle)
 {
   SERIALISE_ELEMENT(srvDriverHandle).Important();
+
+  D3D11ResourceManager *rm = (D3D11ResourceManager *)ser.GetUserData();
+  ResourceId srvResId;
+  rm->GetResourceIdByDriverHandle(srvDriverHandle, srvResId);
+  SERIALISE_ELEMENT(srvResId);
+
   SERIALISE_ELEMENT(samplerDriverHandle).Important();
+  ResourceId sampResId;
+  rm->GetResourceIdByDriverHandle(samplerDriverHandle, sampResId);
+  SERIALISE_ELEMENT(sampResId);
+
   SERIALISE_ELEMENT_LOCAL(cudaTextureHandle, *pCudaTextureHandle);
+  
   if(IsReplayingAndReading())
   {
     uint32_t textureHandle;
-    auto status = NvAPI_D3D11_GetCudaTextureObject(m_pDevice, srvDriverHandle, samplerDriverHandle,
-                                                   (NvU32 *)&textureHandle);
+    WrappedID3D11ShaderResourceView1 *srv =
+        (WrappedID3D11ShaderResourceView1 *)rm->GetLiveResource(srvResId);
+    WrappedID3D11SamplerState *sampler = (WrappedID3D11SamplerState *)rm->GetLiveResource(sampResId);
+    auto status = NvAPI_D3D11_GetCudaTextureObject(
+        m_pDevice, srv->GetDriverHandle(), sampler->GetDriverHandle(), (NvU32 *)&textureHandle);
     if(status == NVAPI_OK)
     {
+      rm->m_TextureObjectHandleMap[textureHandle] = {srvResId, sampResId};
+      rm->m_TextureObjectToNewTextureObjectMap[cudaTextureHandle] = textureHandle;
     }
+  }
+  else
+  {
+    rm->m_TextureObjectHandleMap[*pCudaTextureHandle] = {srvResId, sampResId};
   }
   return true;
 }
@@ -4516,11 +4589,25 @@ _NvAPI_Status WrappedID3D11Device::NvGetCudaTextureObject(uint32_t srvDriverHand
 {
   if(IsCaptureMode(m_State))
   {
+    Chunk *chunk = NULL;
     SCOPED_LOCK(m_D3DLock);
-    USE_SCRATCH_SERIALISER();
-    SCOPED_SERIALISE_CHUNK(D3D11Chunk::NvApi_GetCudaTextureObject);
-    Serialise_NvGetCudaTextureObject(ser, srvDriverHandle, samplerDriverHandle, pCudaTextureHandle);
-    m_DeviceRecord->AddChunk(scope.Get());
+    {
+      USE_SCRATCH_SERIALISER();
+      SCOPED_SERIALISE_CHUNK(D3D11Chunk::NvApi_GetCudaTextureObject);
+      Serialise_NvGetCudaTextureObject(ser, srvDriverHandle, samplerDriverHandle, pCudaTextureHandle);
+      chunk = scope.Get();
+    }
+    ResourceId srvId;
+    GetResourceManager()->GetResourceIdByDriverHandle(srvDriverHandle, srvId);
+    ResourceId sampId;
+    GetResourceManager()->GetResourceIdByDriverHandle(samplerDriverHandle, sampId);
+    D3D11ResourceRecord *record = GetResourceManager()->GetResourceRecord(srvId);
+    RDCASSERT(record);
+    record->AddChunk(chunk);
+    //record = GetResourceManager()->GetResourceRecord(sampId);
+    //RDCASSERT(record);
+    //record->AddChunk(chunk);
+    //m_DeviceRecord->AddChunk(chunk);
   }
   return NVAPI_OK;
 }

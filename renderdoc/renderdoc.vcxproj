@@ -86,7 +86,7 @@
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
-      <AdditionalDependencies>ws2_32.lib;kernel32.lib;user32.lib;shlwapi.lib;setupapi.lib;F:\OBT\Frontend\Engine\Source\ThirdParty\NVIDIA\nvapi\amd64\nvapi64.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ws2_32.lib;kernel32.lib;user32.lib;shlwapi.lib;setupapi.lib;$(SolutionDir)renderdoc\3rdparty\dlssparser\nvapi64.lib;$(SolutionDir)renderdoc\3rdparty\dlssparser\dlss_parser.dll.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <ModuleDefinitionFile>$(ProjectDir)os\win32\comexport.def</ModuleDefinitionFile>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>

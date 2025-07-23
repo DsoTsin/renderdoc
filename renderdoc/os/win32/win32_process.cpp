@@ -613,6 +613,10 @@ rdcpair<RDResult, uint32_t> Process::InjectIntoProcess(uint32_t pid,
   GetModuleFileNameW(GetModuleHandleA(STRINGIZE(RDOC_BASE_NAME) ".dll"), &renderdocPath[0],
                                       MAX_PATH - 1);
 
+  wchar_t dlssParserPath[MAX_PATH] = {0};
+  GetModuleFileNameW(GetModuleHandleA("dlss_parser.dll"), &dlssParserPath[0],
+                                      MAX_PATH - 1);
+
   wchar_t renderdocPathLower[MAX_PATH] = {0};
   memcpy(renderdocPathLower, renderdocPath, MAX_PATH * sizeof(wchar_t));
   for(size_t i = 0; i < MAX_PATH && renderdocPathLower[i]; i++)
@@ -970,6 +974,7 @@ rdcpair<RDResult, uint32_t> Process::InjectIntoProcess(uint32_t pid,
     return {ResultCode::Succeeded, (uint32_t)exitCode};
   }
 
+  InjectDLL(hProcess, dlssParserPath);
   InjectDLL(hProcess, renderdocPath);
 
   const char *rdoc_dll = STRINGIZE(RDOC_BASE_NAME);

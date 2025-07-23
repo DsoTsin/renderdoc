@@ -32,6 +32,7 @@
 #include "driver/dx/official/dxgi1_3.h"
 #include "driver/dxgi/dxgi_common.h"
 #include "driver/shaders/dxbc/dxbc_compile.h"
+#include "dlssparser/ptx_reflect.h"
 
 class WrappedID3D11Device;
 struct D3D11RenderState;
@@ -470,6 +471,8 @@ DECLARE_REFLECTION_ENUM(D3D11Chunk);
 
 SERIALISE_D3D_INTERFACES();
 
+
+DECLARE_REFLECTION_ENUM(ptx_resource_type);
 DECLARE_REFLECTION_ENUM(D3D11_BIND_FLAG);
 DECLARE_REFLECTION_ENUM(D3D11_CPU_ACCESS_FLAG);
 DECLARE_REFLECTION_ENUM(D3D11_RESOURCE_MISC_FLAG);
@@ -505,7 +508,13 @@ DECLARE_REFLECTION_ENUM(D3D11_INPUT_CLASSIFICATION);
 DECLARE_REFLECTION_ENUM(D3D11_LOGIC_OP);
 
 // declare reflect-able types
+struct PTXBindingDesc
+{
+  ptx_resource_type type;
+  int64_t param_byte_offset;
+};
 
+DECLARE_REFLECTION_STRUCT(PTXBindingDesc);
 DECLARE_REFLECTION_STRUCT(D3D11_BUFFER_DESC);
 DECLARE_REFLECTION_STRUCT(D3D11_TEXTURE1D_DESC);
 DECLARE_REFLECTION_STRUCT(D3D11_TEXTURE2D_DESC);

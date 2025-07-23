@@ -127,7 +127,9 @@
     <ClCompile Include="d3d11_manager.cpp" />
     <ClCompile Include="d3d11_renderstate.cpp" />
     <ClCompile Include="d3d11_replay.cpp" />
-    <ClCompile Include="d3d11_resources.cpp" />
+    <ClCompile Include="d3d11_resources.cpp">
+      <ExceptionHandling Condition="'$(Configuration)|$(Platform)'=='Development|x64'">Sync</ExceptionHandling>
+    </ClCompile>
     <ClCompile Include="d3d11_shader_cache.cpp" />
     <ClCompile Include="d3d11_shaderdebug.cpp" />
     <ClCompile Include="d3d11_stringise.cpp" />

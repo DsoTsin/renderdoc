@@ -903,7 +903,7 @@ bool WrappedID3D11DeviceContext::ProcessChunk(ReadSerialiser &ser, D3D11Chunk ch
     case D3D11Chunk::DiscardView1: ret = Serialise_DiscardView1(ser, NULL, NULL, 0); break;
 
     case D3D11Chunk::NvApi_LaunchCubinShader:
-      ret = Serialise_LaunchCubinShader(ser, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+      ret = Serialise_DispatchCUDA(ser, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
       break;
     case D3D11Chunk::PostExecuteCommandList:
       ret = Serialise_PostExecuteCommandList(ser, NULL, FALSE);

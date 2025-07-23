@@ -148,7 +148,7 @@ INVAPID3DDevice : public IUnknown
     return (_NvAPI_Status)-3;
   }
 
-  virtual _NvAPI_Status STDMETHODCALLTYPE D3D11_GetResourceGpuVa(NvGetGpuVa* param)
+  virtual _NvAPI_Status STDMETHODCALLTYPE D3D11_GetResourceGpuVa(NVDX_ObjectHandle__* Object, uint64_t GpuVa, uint64_t Size)
   {
     return (_NvAPI_Status)-3;
   }

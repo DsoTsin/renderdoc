@@ -514,7 +514,7 @@ public:
   IMPLEMENT_FUNCTION_SERIALISED(virtual void STDMETHODCALLTYPE, Dispatch, UINT ThreadGroupCountX,   \
                                 UINT ThreadGroupCountY, UINT ThreadGroupCountZ);                    \
   IMPLEMENT_FUNCTION_SERIALISED(                                                                    \
-      virtual void STDMETHODCALLTYPE, LaunchCubinShader, NVDX_ObjectHandle__ *hShader, UINT gridX,  \
+      virtual void STDMETHODCALLTYPE, DispatchCUDA, NVDX_ObjectHandle__ *hShader, UINT gridX,  \
       UINT gridY, UINT gridZ, const void *pParams, UINT paramSize,                                  \
       const NVDX_ObjectHandle__ **pReadResources, UINT numReadResources,                            \
       const NVDX_ObjectHandle__ **pWriteResources, UINT numWriteResources);                         \

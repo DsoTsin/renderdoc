@@ -125,9 +125,15 @@ protected:
   WrappedID3D11Device *m_pDevice;
   NestedType *m_pReal;
   uint32_t m_DriverHandle;
+  uint64_t m_DriverObject;
 
   WrappedDeviceChild11(NestedType *real, WrappedID3D11Device *device, uint32_t driverHandle = (uint32_t)-1)
-      : m_pDevice(device), m_pReal(real), m_DriverHandle(driverHandle), m_ExtRef(1), m_IntRef(0)
+      : m_pDevice(device),
+        m_pReal(real),
+        m_DriverHandle(driverHandle),
+        m_DriverObject(~0ull),
+        m_ExtRef(1),
+        m_IntRef(0)
   {
     m_ID = ResourceIDGen::GetNewUniqueID();
 
@@ -137,8 +143,15 @@ protected:
     bool ret = m_pDevice->GetResourceManager()->AddWrapper(this, real);
     if(!ret)
       RDCERR("Error adding wrapper for type %s", ToStr(__uuidof(NestedType)).c_str());
-
-    m_pDevice->GetResourceManager()->AddCurrentResource(GetResourceID(), this);
+    if(driverHandle != ~0u)
+    {
+      m_pDevice->GetResourceManager()->AddCurrentResourceWithDriverHandle(GetResourceID(),
+                                                                          driverHandle, this);
+    }
+    else
+    {
+      m_pDevice->GetResourceManager()->AddCurrentResource(GetResourceID(), this);
+    }
   }
 
   virtual ~WrappedDeviceChild11()
@@ -156,7 +169,9 @@ public:
   ResourceId GetResourceID() { return m_ID; }
   NestedType *GetReal() { return m_pReal; }
   uint32_t GetDriverHandle() const { return m_DriverHandle; }
+  uint64_t GetDriverObject() const { return m_DriverObject; }
   void SetDriverHandle(uint32_t handle) { m_DriverHandle = handle; }
+  void SetDriverObject(uint64_t driverHandle) { m_DriverObject = driverHandle; }
   // internal addref/release
   void IntAddRef() { Atomic::Inc32(&m_IntRef); }
   void IntRelease()
@@ -1139,86 +1154,86 @@ private:
   RealVendorType m_Real;
 };
 
-#define FATBIN_TEXT_MAGIC 0xBA55ED50
-
-enum class FatBinFlag : uint64_t
-{
-  None = 0x0,
-  Is64Bit = 0x1ULL << 0,
-  Debug = 0x1ULL << 1,
-  Cuda = 0x1ULL << 2,
-  OpenCL = 0x1ULL << 3,
-  Linux = 0x1ULL << 4,
-  Mac = 0x1ULL << 5,
-  Windows = 0x1ULL << 6,
-  // HostMask = 0xf0,
-  // OptLevelMask = 0xf00,
-  CompressZlib = 0x1ULL << 12,
-  CompressLz = 0x1ULL << 13,
-  All = ~0ull
-};
-
-enum class FatBinKind : uint16_t
-{
-  PTX = 0x0001,
-  ELF = 0x0002,
-  NVVM = 0x0008,
-  MERCURY = 0x0010,
-};
-
-#ifdef __GNUC__
-#define PACK(__Declaration__) __Declaration__ __attribute__((__packed__))
-#endif
-
-#ifdef _MSC_VER
-#define PACK(__Declaration__) __pragma(pack(push, 1)) __Declaration__ __pragma(pack(pop))
-#endif
-
-PACK(struct FatBinHeader {
-  uint32_t magic;
-  uint16_t version;
-  uint16_t header_size;
-  uint64_t size;
-});
-
-PACK(struct FatCodeHeader {
-  FatBinKind kind;
-  uint16_t version;
-  uint32_t header_size;
-  uint64_t size;
-  uint32_t compressed_size;
-  uint32_t kind_offset;
-  uint16_t minor;
-  uint16_t major;
-  uint32_t arch;
-  uint32_t obj_name_offset;
-  uint32_t obj_name_len;
-  FatBinFlag flags;
-  uint64_t obfuscation_key;
-  uint64_t decompressed_size;
-});
+#include "dlssparser/ptx_reflect.h"
 
 struct WrappedCubinShader : public WrappedVendorResource<NVDX_ObjectHandle__ *>
 {
 public:
+  struct BindingDesc
+  {
+    rdcstr param_name;
+    ptx_resource_type type;
+    int64_t param_byte_offset;
+    uint32_t param_index;
+  };
+
+  struct ParamDesc
+  {
+    rdcstr param_name;
+    int64_t param_byte_offset;
+    uint32_t param_index;
+    size_t size;
+    size_t align;
+  };
+
   WrappedCubinShader(NVDX_ObjectHandle__ *real, ResourceId origId, const byte *code, size_t codeLen,
                      const char *name, uint32_t blkx, uint32_t blky, uint32_t blkz,
                      WrappedID3D11Device *device);
-  virtual ~WrappedCubinShader() {}
+  virtual ~WrappedCubinShader();
   virtual const rdcstr &GetName() const override { return m_Name; }
+
+  size_t GetParamBufferSize() const { return m_ParamBufferSize; }
+  void GetResourceBindings(rdcarray<PTXBindingDesc> &Bindings) const;
 
   friend class CubinParser;
 private:
-  bytebuf m_Fatbin;
-  rdcarray<FatCodeHeader> m_FatCodes;
+  static void on_iter_param(const int8_t *pname, size_t pnamelen, int64_t offset,
+                            uint32_t param_index, size_t param_size, size_t param_alignment,
+                            void *p)
+  {
+    WrappedCubinShader *shader = (WrappedCubinShader *)p;
+    rdcstr param((const char *)pname, pnamelen);
+    shader->on_gather_param(std::move(param), offset, param_index, param_size, param_alignment);
+  }
+  void on_gather_param(rdcstr pname, int64_t offset, uint32_t param_index, size_t param_size,
+                       size_t param_alignment);
+  static void on_iter_binding(const int8_t *pname, size_t pnamelen, ptx_resource_type ty,
+                              int64_t offset, uint32_t param_index, void *p)
+  {
+    WrappedCubinShader *shader = (WrappedCubinShader *)p;
+    rdcstr param((const char *)pname, pnamelen);
+    shader->on_gather_binding(std::move(param), ty, offset, param_index);
+  }
+  void on_gather_binding(rdcstr pname, ptx_resource_type ty, int64_t offset, uint32_t param_index);
+  void AdjustBindings();
+
   rdcstr m_Name;
   uint32_t m_BlockX;
   uint32_t m_BlockY;
   uint32_t m_BlockZ;
   WrappedID3D11Device *m_pDevice;
+  void *m_FatbinLoader;
+  rdcstr m_PtxCode;
+  struct fatbin_reflection_container *m_ReflectionContainer;
+  rdcarray<ParamDesc> m_Params;
+  size_t m_ParamBufferSize;
+  rdcarray<BindingDesc> m_Bindings;
+
   int32_t m_ExtRef;
   int32_t m_IntRef;
 };
+
+struct WrappedNvResource : public IVendorResource
+{
+  WrappedNvResource(NVDX_ObjectHandle__ *real, ResourceId origId,
+                     WrappedID3D11Device *device);
+  virtual const rdcstr &GetName() const override { return m_Name; }
+  NVDX_ObjectHandle__ *real() const { return m_Handle; }
+private:
+  NVDX_ObjectHandle__ *m_Handle;
+  rdcstr m_Name;
+};
+
 
 template <class RealShaderType>
 class WrappedID3D11Shader : public WrappedDeviceChild11<RealShaderType>, public WrappedShader

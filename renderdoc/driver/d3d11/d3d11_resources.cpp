@@ -29,6 +29,11 @@
 #include "driver/shaders/dxbc/dxbc_reflect.h"
 #include "d3d11_context.h"
 #include "d3d11_renderstate.h"
+#include <algorithm>
+
+#pragma comment(lib, "ntdll")
+#pragma comment(lib, "Userenv")
+
 
 WRAPPED_POOL_INST(WrappedID3D11Buffer);
 WRAPPED_POOL_INST(WrappedID3D11Texture1D);
@@ -736,75 +741,24 @@ WrappedID3DDeviceContextState::~WrappedID3DDeviceContextState()
   }
 }
 
-#include "elfio/elfio.hpp"
-#include "lz4/lz4.h"
 
-#define EIATTR_MIN_STACK_SIZE 0x1204
-
-// Constants for attributes defined in .nv.info.<func_name> sections
-// along with their size in increments of 32-bit word (section is .align 4)
-#define EIATTR_CUDA_API_VERSION 0x3704
-#define EIATTR_CUDA_API_VERSION_ATTR_WORD_LEN 2
-
-#define EIATTR_CRS_STACK_SIZE 0x1e04
-#define EIATTR_CRS_STACK_SIZE_ATTR_WORD_LEN 2
-
-#define EIATTR_PARAM_CBANK 0x0a04
-#define EIATTR_PARAM_CBANK_ATTR_WORD_LEN 3
-
-#define EIATTR_CBANK_PARAM_SIZE 0x1903
-#define EIATTR_CBANK_PARAM_SIZE_ATTR_WORD_LEN 1
-
-#define EIATTR_KPARAM_INFO 0x1704
-#define EIATTR_KPARAM_INFO_ATTR_WORD_LEN 4
-
-#define EIATTR_MAXREG_COUNT 0x1b03
-#define EIATTR_MAXREG_COUNT_ATTR_WORD_LEN 1
-
-#define EIATTR_COOP_GROUP_MASK_REGIDS 0x2904
-#define EIATTR_COOP_GROUP_MASK_REGIDS_ATTR_WORD_LEN 1
-
-#define EIATTR_EXIT_INSTR_OFFSETS 0x1c04
-#define EIATTR_EXIT_INSTR_OFFSETS_ATTR_WORD_LEN 4
-
-#define EIATTR_SW2861232_WAR 0x3501
-#define EIATTR_SW2861232_WAR_ATTR_WORD_LEN 1
-
-#define EIATTR_SW2393858_WAR 0x3001
-#define EIATTR_SW2393858_WAR_ATTR_WORD_LEN 1
-
-#define EIATTR_SW1850030_WAR 0x2a01
-#define EIATTR_SW1850030_WAR_ATTR_WORD_LEN 1
-
-#define EIATTR_SW_WAR 0x3604
-#define EIATTR_SW_WAR_ATTR_WORD_LEN 2
-
-#define EIATTR_S2RCTAID_INSTR_OFFSETS 0x1d04
-#define EIATTR_S2RCTAID_INSTR_OFFSETS_ATTR_BASE_WORD_LEN 1
-
-#define EIATTR_EXTERNS 0x0f04
-#define EIATTR_EXTERNS_ATTR_WORD_LEN 2
-
-#define EIATTR_SYSCALL_OFFSETS 0x4604
-#define EIATTR_SYSCALL_OFFSETS_ATTR_WORD_LEN 2
-
-PACK(struct FatBinPTX
+int32_t ReportCrash(LPEXCEPTION_POINTERS ExceptionInfo)
 {
-  uint32_t ptxasOptions;    // const char*
-  uint32_t ptxasOptionsSize;
-});
+  return EXCEPTION_EXECUTE_HANDLER;
+}
 
 WrappedCubinShader::WrappedCubinShader(NVDX_ObjectHandle__ *real, ResourceId origId, const byte *code,
                                        size_t codeLen, const char *name, uint32_t blkx,
                                        uint32_t blky, uint32_t blkz, WrappedID3D11Device *device)
 
     : WrappedVendorResource<NVDX_ObjectHandle__*>(real),
-      m_Fatbin(code, codeLen),
       m_Name(name),
       m_BlockX(blkx),
       m_BlockY(blky),
       m_BlockZ(blkz),
-      m_pDevice(device)
+      m_pDevice(device),
+      m_FatbinLoader(nullptr),
+      m_ReflectionContainer(nullptr)
 {
   m_pDevice->AddRef();
 
@@ -812,25 +766,101 @@ WrappedCubinShader::WrappedCubinShader(NVDX_ObjectHandle__ *real, ResourceId ori
   {
     m_ID = origId;
   }
-  const byte *end = code + codeLen;
-    FatBinHeader *header = (FatBinHeader *)code;
-  const byte *ptr = nullptr;
-  if(header->magic == FATBIN_TEXT_MAGIC)
+  m_ParamBufferSize = 0;
+
+  m_FatbinLoader = fatbin_load(code, codeLen);
+  if (m_FatbinLoader)
   {
-    ptr = code + header->header_size;
-    while (ptr != end)
+    size_t ptx_size = fatbin_get_ptx_size(m_FatbinLoader);
+    m_PtxCode.assign(
+        (const char*)fatbin_get_ptx_data(m_FatbinLoader), ptx_size
+    );
+
     {
-      FatCodeHeader *cHeader = (FatCodeHeader *)ptr;
-      m_FatCodes.push_back(*cHeader);
-      if (cHeader->kind == FatBinKind::ELF)
-      {
+      SCOPED_LOCK(WrappedShader::m_ShaderListLock);
 
-      }
-      else if (cHeader->kind == FatBinKind::PTX)
-      {
+      //RDCASSERT(WrappedShader::m_ShaderList.find(m_ID) == WrappedShader::m_ShaderList.end());
+      WrappedShader::m_ShaderList[m_ID] = new WrappedShader::ShaderEntry(
+          device, origId != ResourceId() ? origId : m_ID, (const byte*)m_PtxCode.data(), m_PtxCode.size());
 
-      }
-      ptr += cHeader->header_size + cHeader->size;
+    }
+    m_ReflectionContainer = fatbin_create_reflection_container(m_FatbinLoader);
+    if(m_ReflectionContainer)
+    {
+      auto param_count = fatbin_reflection_container_get_param_count(m_ReflectionContainer);
+      m_Params.reserve(param_count);
+      fatbin_reflection_container_iterate_params(m_ReflectionContainer,
+                                                 &WrappedCubinShader::on_iter_param, this);
+      std::sort(m_Params.begin(), m_Params.end(), [](const ParamDesc &a, const ParamDesc &b) {
+        return a.param_index < b.param_index;
+      });
+      auto binding_count = fatbin_reflection_container_get_resource_count(m_ReflectionContainer);
+      m_Bindings.reserve(binding_count);
+      fatbin_reflection_container_iterate_bindings(m_ReflectionContainer,
+                                                   &WrappedCubinShader::on_iter_binding, this);
+      std::sort(m_Bindings.begin(), m_Bindings.end(), [](const BindingDesc &a, const BindingDesc &b) {
+        return a.param_index < b.param_index;
+      });
+      AdjustBindings();
     }
   }
+  else
+  {
+  }
+}
+
+WrappedCubinShader::~WrappedCubinShader()
+{
+  if (m_FatbinLoader)
+  {
+    if (m_ReflectionContainer)
+    {
+      fatbin_free_reflection_container(m_ReflectionContainer);
+      m_ReflectionContainer = nullptr;
+    }
+    fatbin_free(m_FatbinLoader);
+    m_FatbinLoader = nullptr;
+  }
+}
+
+void WrappedCubinShader::on_gather_param(rdcstr pname, int64_t offset, uint32_t param_index,
+                                         size_t param_size, size_t param_alignment)
+{
+  m_Params.push_back({std::move(pname), offset, param_index, param_size, param_alignment});
+  m_ParamBufferSize += param_size;
+}
+
+void WrappedCubinShader::on_gather_binding(rdcstr pname, ptx_resource_type ty, int64_t offset,
+                                           uint32_t param_index)
+{
+  m_Bindings.push_back({std::move(pname), ty, offset, param_index});
+}
+
+void WrappedCubinShader::AdjustBindings()
+{
+  size_t Offset = 0;
+  for(auto &Param : m_Params)
+  {
+    Param.param_byte_offset = Offset;
+    Offset += Param.size;
+  }
+  for(auto &Binding : m_Bindings)
+  {
+    Binding.param_byte_offset =
+        m_Params[Binding.param_index].param_byte_offset + Binding.param_byte_offset;
+  }
+}
+
+void WrappedCubinShader::GetResourceBindings(rdcarray<PTXBindingDesc> &Bindings) const
+{
+  for(auto Binding : m_Bindings)
+  {
+    Bindings.push_back({Binding.type, Binding.param_byte_offset});
+  }
+}
+
+WrappedNvResource::WrappedNvResource(NVDX_ObjectHandle__ *real, ResourceId origId, WrappedID3D11Device *device)
+{
+  m_ID = origId;
+  m_Handle = real;
 }

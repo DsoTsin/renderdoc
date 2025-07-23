@@ -603,20 +603,34 @@ private:
       const NVDX_ObjectHandle *pWriteResources, NvU32 numWriteResources)
   {
     WrappedCubinShader *wrappedShader = (WrappedCubinShader *)hShader;
+
+    rdcarray<NVDX_ObjectHandle> readObjects;
+    readObjects.reserve(numReadResources);
+    rdcarray<NVDX_ObjectHandle> writeObjects;
+    writeObjects.reserve(numWriteResources);
+
+    for(NvU32 i = 0; i < numReadResources; i++)
+    {
+      readObjects.push_back(((WrappedNvResource *)pReadResources[i])->real());
+    }
+    for(NvU32 i = 0; i < numWriteResources; i++)
+    {
+      writeObjects.push_back(((WrappedNvResource *)pWriteResources[i])->real());
+    }
+
     NvAPI_Status status = nvhooks.NvAPI_D3D11_LaunchCubinShader()(
         pDeviceContext, wrappedShader->real(), gridX, gridY, gridZ, pParams, paramSize,
-        pReadResources,
-        numReadResources, pWriteResources, numWriteResources);
+        readObjects.data(), numReadResources, writeObjects.data(), numWriteResources);
     Microsoft::WRL::ComPtr<ID3D11Device> pDevice;
     pDeviceContext->GetDevice(&pDevice);
     if (WrappedID3D11Device::IsAlloc(pDevice.Get()))
     {
       WrappedID3D11DeviceContext *context = (WrappedID3D11DeviceContext *)pDeviceContext;
-      context->LaunchCubinShader(hShader,
+      context->DispatchCUDA(hShader,
           gridX, gridY, gridZ, 
           pParams, paramSize, 
-          (const NVDX_ObjectHandle__**)pReadResources, numReadResources, 
-          (const NVDX_ObjectHandle__**)pWriteResources, numWriteResources);
+          (const NVDX_ObjectHandle__ **)pReadResources, numReadResources, 
+          (const NVDX_ObjectHandle__ **)pWriteResources, numWriteResources);
     }
     return status;
   }
@@ -783,15 +797,16 @@ private:
   {
     ID3D11Device *dev = NULL;
     HRESULT hr = pDevice->QueryInterface(__uuidof(ID3D11Device), (void **)&dev);
+    auto wrappedResourceHandle = pParams->hResource;
+    pParams->hResource = ((WrappedNvResource*)pParams->hResource)->real();
+    if(nvhooks.NvAPI_D3D11_GetResourceGPUVirtualAddressEx() == nullptr)
+    {
+      nvhooks.NvAPI_D3D11_GetResourceGPUVirtualAddressEx.SetFuncPtr(nvhooks.nvapi_QueryInterface()(0xaf6d14da));
+    }
     NvAPI_Status status = nvhooks.NvAPI_D3D11_GetResourceGPUVirtualAddressEx()(dev, pParams);
     INVAPID3DDevice *nvapiDev = NULL;
     hr = pDevice->QueryInterface(__uuidof(INVAPID3DDevice), (void **)&nvapiDev);
-    NvGetGpuVa param = {
-        pParams->hResource,
-        pParams->gpuVAStart,
-        pParams->gpuVASize,
-    };
-    nvapiDev->D3D11_GetResourceGpuVa(&param);
+    nvapiDev->D3D11_GetResourceGpuVa(wrappedResourceHandle, pParams->gpuVAStart, pParams->gpuVASize);
     (void)hr;
     return status;
   }
@@ -802,15 +817,19 @@ private:
   {
     ID3D11Device *dev = NULL;
     HRESULT hr = pDevice->QueryInterface(__uuidof(ID3D11Device), (void **)&dev);
-    NvAPI_Status status = nvhooks.NvAPI_D3D11_GetResourceGPUVirtualAddress()(dev, hResource, pGpuVA);
+
+    NV_GET_GPU_VIRTUAL_ADDRESS params = {NV_GET_GPU_VIRTUAL_ADDRESS_VER};
+    params.hResource = ((WrappedNvResource *)hResource)->real();
+    if(nvhooks.NvAPI_D3D11_GetResourceGPUVirtualAddressEx() == nullptr)
+    {
+      nvhooks.NvAPI_D3D11_GetResourceGPUVirtualAddressEx.SetFuncPtr(
+          nvhooks.nvapi_QueryInterface()(0xaf6d14da));
+    }
+    NvAPI_Status status = nvhooks.NvAPI_D3D11_GetResourceGPUVirtualAddressEx()(dev, &params);
+    *pGpuVA = params.gpuVAStart;
     INVAPID3DDevice *nvapiDev = NULL;
     hr = pDevice->QueryInterface(__uuidof(INVAPID3DDevice), (void **)&nvapiDev);
-    NvGetGpuVa param = {
-        hResource,
-        *pGpuVA,
-        0,
-    };
-    nvapiDev->D3D11_GetResourceGpuVa(&param);
+    nvapiDev->D3D11_GetResourceGpuVa(hResource, *pGpuVA, params.gpuVASize);
     (void)hr;
     return status;
   }

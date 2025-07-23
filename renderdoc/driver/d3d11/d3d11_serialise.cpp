@@ -66,7 +66,11 @@ void DoSerialiseNVDXObjectHandleViaResourceId(SerialiserType &ser, NVDX_ObjectHa
   if(ser.IsReading())
   {
     if(id != ResourceId() && rm && rm->HasLiveResource(id))
+    {
       el = (NVDX_ObjectHandle__ *)rm->GetLiveVendorResource(id);
+      if(el == NULL)
+        el = (NVDX_ObjectHandle__ *)rm->GetLiveResource(id);
+    }
     else
       el = NULL;
   }
@@ -87,7 +91,11 @@ void DoSerialiseNVDXObjectHandleViaResourceId(SerialiserType &ser, NVDX_ObjectHa
   if(ser.IsReading())
   {
     if(id != ResourceId() && rm && rm->HasLiveResource(id))
+    {
       el = (NVDX_ObjectHandle__ *)rm->GetLiveVendorResource(id);
+      if(el == NULL)
+        el = (NVDX_ObjectHandle__ *)rm->GetLiveResource(id);
+    }
     else
       el = NULL;
   }
@@ -119,6 +127,14 @@ void DoSerialise(SerialiserType &ser, NVDX_ObjectHandle__ const*&el)
 
 INSTANTIATE_SERIALISE_TYPE(NVDX_ObjectHandle__ *)
 INSTANTIATE_SERIALISE_TYPE(NVDX_ObjectHandle__ const*)
+
+
+template <class SerialiserType>
+void DoSerialise(SerialiserType &ser, PTXBindingDesc &el)
+{
+  SERIALISE_MEMBER_TYPED(ptx_resource_type, type).Important();
+  SERIALISE_MEMBER(param_byte_offset);
+}
 
 template <class SerialiserType>
 void DoSerialise(SerialiserType &ser, D3D11_BUFFER_DESC &el)
@@ -841,6 +857,7 @@ void DoSerialise(SerialiserType &ser, D3D11_BOX &el)
   SERIALISE_MEMBER(back);
 }
 
+INSTANTIATE_SERIALISE_TYPE(PTXBindingDesc);
 INSTANTIATE_SERIALISE_TYPE(D3D11_BUFFER_DESC);
 INSTANTIATE_SERIALISE_TYPE(D3D11_TEXTURE1D_DESC);
 INSTANTIATE_SERIALISE_TYPE(D3D11_TEXTURE2D_DESC);

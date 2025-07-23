@@ -550,9 +550,9 @@ _NvAPI_Status STDMETHODCALLTYPE WrappedNVAPI11::D3D11_GetResourceHandle(ID3D11Re
   return NVAPI_OK;
 }
 
-_NvAPI_Status __stdcall WrappedNVAPI11::D3D11_GetResourceGpuVa(NvGetGpuVa* params)
+_NvAPI_Status __stdcall WrappedNVAPI11::D3D11_GetResourceGpuVa(NVDX_ObjectHandle__* Object, uint64_t GpuVa, uint64_t Size)
 {
-  m_pDevice.NvGetResourceGpuVa(params);
+  m_pDevice.NvGetResourceGpuVa(Object, GpuVa, Size);
   return NVAPI_OK;
 }
 
@@ -1127,7 +1127,7 @@ bool WrappedID3D11Device::ProcessChunk(ReadSerialiser &ser, D3D11Chunk context)
     case D3D11Chunk::NvApi_GetCudaTextureObject:
       return Serialise_NvGetCudaTextureObject(ser, 0, 0, 0);
     case D3D11Chunk::NvApi_GetResourceHandle: return Serialise_NvGetResourceHandle(ser, 0, 0);
-    case D3D11Chunk::NvApi_GetResourceGpuVa: return Serialise_NvGetResourceGpuVa(ser, 0x0);
+    case D3D11Chunk::NvApi_GetResourceGpuVa: return Serialise_NvGetResourceGpuVa(ser, 0x0,0,0);
     case D3D11Chunk::SetResourceName: return Serialise_SetResourceName(ser, 0x0, "");
     case D3D11Chunk::CreateSwapBuffer:
       return Serialise_WrapSwapchainBuffer(ser, 0x0, DXGI_FORMAT_UNKNOWN, 0, 0x0);

@@ -212,7 +212,7 @@ public:
   virtual _NvAPI_Status STDMETHODCALLTYPE
   D3D11_GetResourceHandle(ID3D11Resource *pResource, NVDX_ObjectHandle__ **phObject) override;
   virtual _NvAPI_Status STDMETHODCALLTYPE
-  D3D11_GetResourceGpuVa(NvGetGpuVa* params) override;
+  D3D11_GetResourceGpuVa(NVDX_ObjectHandle__* Object, uint64_t GpuVa, uint64_t Size) override;
   virtual _NvAPI_Status STDMETHODCALLTYPE D3D11_GetCudaTextureObject(
       uint32_t srvDriverHandle, uint32_t samplerDriverHandle, uint32_t *pCudaTextureHandle) override;
 
@@ -1206,7 +1206,7 @@ public:
                                 ID3D11UnorderedAccessView **ppUAV, uint32_t *pDriverHandle);      \
   IMPLEMENT_FUNCTION_SERIALISED(_NvAPI_Status, NvGetResourceHandle, ID3D11Resource *pResource,    \
                                 NVDX_ObjectHandle__ **phObject);                                  \
-  IMPLEMENT_FUNCTION_SERIALISED(_NvAPI_Status, NvGetResourceGpuVa, NvGetGpuVa *param);            \
+  IMPLEMENT_FUNCTION_SERIALISED(_NvAPI_Status, NvGetResourceGpuVa, NVDX_ObjectHandle__* Object, uint64_t GpuVa, uint64_t Size);            \
   IMPLEMENT_FUNCTION_SERIALISED(_NvAPI_Status, NvGetCudaTextureObject, uint32_t srvDriverHandle,  \
                                 uint32_t samplerDriverHandle, uint32_t *pCudaTextureHandle);
   SERIALISED_ID3D11NVAPI_FUNCTIONS()

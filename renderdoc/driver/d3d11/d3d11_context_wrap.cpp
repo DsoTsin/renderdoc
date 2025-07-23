@@ -5114,30 +5114,8 @@ void WrappedID3D11DeviceContext::Dispatch(UINT ThreadGroupCountX, UINT ThreadGro
 
 #pragma optimize("",off)
 
-class CubinParser
-{
-public:
-  struct ParamInfo
-  {
-  };
-
-  CubinParser(WrappedCubinShader *shader)
-      : kernelName(shader->m_Name), ptr(shader->m_Fatbin.data()), len(shader->m_Fatbin.size())
-  {
-
-  }
-
-  void parse();
-
-private:
-  rdcstr kernelName;
-  //ELFIO::elfio elf_reader;
-  const uint8_t *ptr;
-  size_t len;
-};
-
 template <typename SerialiserType>
-bool WrappedID3D11DeviceContext::Serialise_LaunchCubinShader(
+bool WrappedID3D11DeviceContext::Serialise_DispatchCUDA(
     SerialiserType &ser, 
     NVDX_ObjectHandle__ *hShader, UINT gridX, UINT gridY, UINT gridZ, const void *pParams,
     UINT paramSize, const NVDX_ObjectHandle__ **pReadResources, UINT numReadResources,
@@ -5154,22 +5132,252 @@ bool WrappedID3D11DeviceContext::Serialise_LaunchCubinShader(
   SERIALISE_ELEMENT_ARRAY(pWriteResources, numWriteResources);
   SERIALISE_ELEMENT_LOCAL(numWriteResources_, (uint32_t)numWriteResources);
 
+  // Buffer/Texture handle patch
+  WrappedCubinShader *cubinShader = (WrappedCubinShader *)hShader;
+  rdcarray<PTXBindingDesc> bindingDescs;
+  cubinShader->GetResourceBindings(bindingDescs);
+  RDCASSERT(cubinShader->GetParamBufferSize() == paramSize_);
+
+  RDCDEBUG("LaunchCuda %s", cubinShader->GetName().c_str());
+  D3D11ResourceManager *rm = (D3D11ResourceManager *)ser.GetUserData();
+  for(auto &binding : bindingDescs)
+  {
+    const uint8_t *bindingAddr = ((const uint8_t *)pParams) + binding.param_byte_offset;
+    switch(binding.type) // Writing: serialize resource id, 
+                         //          real handle -> resource id
+                         //          real gpu address -> resource id
+                         // Reading: resource id -> real resource -> real handle
+    {
+      case ptx_resource_type_buffer:
+      {
+        if(ser.IsWriting())
+        {
+          uint64_t gpuVA = *(const uint64_t *)bindingAddr;
+          if (rm->m_GpuAddressToIdMap.find(gpuVA) != rm->m_GpuAddressToIdMap.end())
+          {
+            ResourceId resId = rm->m_GpuAddressToIdMap[gpuVA].first;
+            WrappedDeviceChild11<ID3D11Resource> *res =
+                (WrappedDeviceChild11<ID3D11Resource> *)rm->GetCurrentResource(resId);
+            auto resName = GetDebugName(res);
+            RDCLOG("Found device buffer %s@%d %llu", resName.c_str(),
+                   binding.param_byte_offset, gpuVA);
+          }
+          else
+          {
+            bool foundAddress = false;
+            uint64_t address = 0;
+            uint64_t addressOffset = 0;
+            ResourceId resId;
+            for(auto &addressRange : rm->m_GpuAddressToIdMap)
+            {
+              if(gpuVA > addressRange.first)
+              {
+                addressOffset = gpuVA - addressRange.first;
+                if(addressOffset < addressRange.second.second)
+                {
+                  resId = addressRange.second.first;
+                  address = addressRange.second.second;
+                  foundAddress = true;
+                  break;
+                }
+              }
+            }
+            if (foundAddress)
+            {
+              WrappedDeviceChild11<ID3D11Resource> *res =
+                  (WrappedDeviceChild11<ID3D11Resource> *)rm->GetCurrentResource(resId);
+              auto resName = GetDebugName(res);
+              RDCLOG("Found device buffer %s@%d %llu with offset %llu", resName.c_str(), binding.param_byte_offset, address,
+                     addressOffset);
+            }
+            // may contains bias
+            RDCASSERT(foundAddress || gpuVA == 0);
+          }
+          // todo: may has analyze error [enc_layer0..]
+        }
+        else // reading
+        {
+          uint64_t& bufferAddr = *(uint64_t*)(((uint8_t *)pParams) + binding.param_byte_offset); // origin buffer address => old resId => new resId => new address
+          if (rm->m_GpuAddressToNewAddressMap.find(bufferAddr) !=
+              rm->m_GpuAddressToNewAddressMap.end())
+          {
+            auto resId = rm->m_GpuAddressToIdMap[bufferAddr].first;
+            bufferAddr = rm->m_GpuAddressToNewAddressMap[bufferAddr].first;
+            WrappedDeviceChild11<ID3D11Resource> *res =
+                (WrappedDeviceChild11<ID3D11Resource> *)rm->GetLiveResource(resId);
+            auto resName = GetDebugName(res);
+            RDCDEBUG("Found device buffer %s:%d @ 0x%p", resName.c_str(),
+                    binding.param_byte_offset, bufferAddr);
+          }
+          else
+          {
+            bool foundAddress = false;
+            uint64_t addressStart = 0;
+            uint64_t addressOffset = 0;
+            uint64_t addressSize = 0;
+            for(auto &addressRange : rm->m_GpuAddressToNewAddressMap)
+            {
+              if(bufferAddr > addressRange.first)
+              {
+                addressOffset = bufferAddr - addressRange.first;
+                if(addressOffset < addressRange.second.second)
+                {
+                  addressStart = addressRange.first;
+                  addressSize = addressRange.second.second;
+                  bufferAddr = addressRange.second.first + addressOffset;
+                  foundAddress = true;
+                  break;
+                }
+              }
+            }
+            if(foundAddress)
+            {
+              auto resId = rm->m_GpuAddressToIdMap[addressStart].first;
+              WrappedDeviceChild11<ID3D11Resource> *res =
+                  (WrappedDeviceChild11<ID3D11Resource> *)rm->GetLiveResource(resId);
+              auto resName = GetDebugName(res);
+              RDCDEBUG("Found device buffer %s:%d %llu with offset %llu, size: %llu @ 0x%p",
+                      resName.c_str(), binding.param_byte_offset, addressStart, addressOffset,
+                      addressSize, bufferAddr);
+            }
+            RDCASSERT(foundAddress || bufferAddr == 0);
+          }
+        }
+        break;
+      }
+      case ptx_resource_type_texture:
+      {
+        if(ser.IsWriting())
+        {
+          uint32_t texObject = *(const uint32_t *)bindingAddr;
+          RDCASSERT(rm->m_TextureObjectHandleMap.find(texObject) !=
+                    rm->m_TextureObjectHandleMap.end() || texObject == 0);
+          if (texObject)
+          {
+            auto &combo = rm->m_TextureObjectHandleMap[texObject];
+            MarkResourceReferenced(combo.Srv, eFrameRef_Read);
+
+            WrappedID3D11ShaderResourceView1 *res =
+                (WrappedID3D11ShaderResourceView1 *)rm->GetCurrentResource(combo.Srv);
+            ID3D11Resource *pres = NULL;
+            res->GetResource(&pres);
+            RDCASSERT(pres);
+            auto resName = GetDebugName(pres);
+            pres->Release();
+            RDCDEBUG("Found device texture %s: %d", resName.c_str(), binding.param_byte_offset);
+
+            MarkResourceReferenced(combo.Sampler, eFrameRef_Read);
+          }
+        }
+        else    // reading
+        {
+          uint32_t &texObject = *(uint32_t *)(((uint8_t *)pParams) +
+                                              binding.param_byte_offset);    // origin texture
+          if (rm->m_TextureObjectToNewTextureObjectMap.find((uint32_t)texObject) !=
+              rm->m_TextureObjectToNewTextureObjectMap.end())
+          {
+            texObject = rm->m_TextureObjectToNewTextureObjectMap[(uint32_t)texObject];
+            auto &combo = rm->m_TextureObjectHandleMap[(uint32_t)texObject];
+            WrappedID3D11ShaderResourceView1 *res =
+                (WrappedID3D11ShaderResourceView1 *)rm->GetLiveResource(combo.Srv);
+            ID3D11Resource *pres = NULL;
+            res->GetResource(&pres);
+            RDCASSERT(pres);
+            auto resName = GetDebugName(pres);
+            pres->Release();
+            RDCDEBUG("Found device texture %s: %d", resName.c_str(), binding.param_byte_offset);
+          }
+          else
+          {
+            RDCASSERT(texObject == 0);
+          }
+        }
+        break;
+      }
+      case ptx_resource_type_surface:
+      {
+        if(ser.IsWriting())
+        {
+          uint32_t surfObject = *(const uint32_t *)bindingAddr;
+          if (surfObject != 0)
+          {
+            ResourceId surfId;
+            RDCASSERT(rm->GetResourceIdByDriverHandle(surfObject, surfId));
+            if(rm->GetResourceIdByDriverHandle(surfObject, surfId))
+            {
+              MarkResourceReferenced(surfId, eFrameRef_PartialWrite);
+              WrappedID3D11UnorderedAccessView1 *res =
+                  (WrappedID3D11UnorderedAccessView1 *)rm->GetCurrentResource(surfId);
+              ID3D11Resource *pres = NULL;
+              res->GetResource(&pres);
+              RDCASSERT(pres);
+              auto resName = GetDebugName(pres);
+              pres->Release();
+              RDCDEBUG("Found device surface %s: %d", resName.c_str(), binding.param_byte_offset);
+            }
+          }
+        }
+        else    // reading
+        {
+          uint32_t &surfObject =
+              *(uint32_t *)(((uint8_t *)pParams) + binding.param_byte_offset);    // origin surface
+          if(rm->m_ViewHandleMap.find((uint32_t)surfObject) != rm->m_ViewHandleMap.end())
+          {
+            auto surfId = rm->m_ViewHandleToIdMap[(uint32_t)surfObject];
+            surfObject = rm->m_ViewHandleMap[(uint32_t)surfObject];
+            WrappedID3D11UnorderedAccessView1 *res =
+                (WrappedID3D11UnorderedAccessView1 *)rm->GetLiveResource(surfId);
+            ID3D11Resource *pres = NULL;
+            res->GetResource(&pres);
+            RDCASSERT(pres);
+            auto resName = GetDebugName(pres);
+            pres->Release();
+            RDCDEBUG("Found device surface %s: %d", resName.c_str(), binding.param_byte_offset);
+          }
+          else
+          {
+            RDCASSERT(surfObject == 0);
+          }
+        }
+        break;
+      }
+    }
+  }
+
   Serialise_DebugMessages(GET_SERIALISER);
 
   SERIALISE_CHECK_READ_ERRORS();
 
   if(IsReplayingAndReading())
   {
-    WrappedCubinShader *cubinShader = (WrappedCubinShader *)hShader;
-    CubinParser parser(cubinShader);
-    parser.parse();
-    NvAPI_D3D11_LaunchCubinShader(m_pRealContext, cubinShader->real(), gridX, gridY, gridZ, pParams,
+    std::vector<NVDX_ObjectHandle> readResources;
+    readResources.reserve(numReadResources_);
+    std::vector<NVDX_ObjectHandle> writeResources;
+    writeResources.reserve(numWriteResources_);
+    for(UINT i = 0; i < numReadResources_; i++)
+    {
+      readResources.push_back(
+          (NVDX_ObjectHandle)((WrappedDeviceChild11<ID3D11Resource> *)pReadResources[i])
+              ->GetDriverObject());
+    }
+    for(UINT i = 0; i < numWriteResources_; i++)
+    {
+      writeResources.push_back(
+          (NVDX_ObjectHandle)((WrappedDeviceChild11<ID3D11Resource> *)pWriteResources[i])
+              ->GetDriverObject());
+    }
+    //static int count = 0;
+    //if(count >= 12)
+    //  return true;
+
+    auto status = NvAPI_D3D11_LaunchCubinShader(m_pRealContext, cubinShader->real(), gridX, gridY, gridZ, pParams,
                                   paramSize_,
-                                  (const NVDX_ObjectHandle *)pReadResources, numReadResources,
-                                  (const NVDX_ObjectHandle *)pWriteResources, numWriteResources);
+        (const NVDX_ObjectHandle *)readResources.data(), numReadResources_,
+        (const NVDX_ObjectHandle *)writeResources.data(), numWriteResources_);
 
+    //count++;
     //MarkResourceReferenced(cubinShader->GetResourceID(), eFrameRef_Read);
-
+    RDCASSERT(status == NVAPI_OK);
     if(IsLoading(m_State))
     {
       RecordDispatchStats(false);
@@ -5205,12 +5413,7 @@ bool WrappedID3D11DeviceContext::Serialise_LaunchCubinShader(
   return true;
 }
 
-void CubinParser::parse()
-{
-
-}
-
-void WrappedID3D11DeviceContext::LaunchCubinShader(
+void WrappedID3D11DeviceContext::DispatchCUDA(
     NVDX_ObjectHandle__ *hShader, UINT gridX, UINT gridY, UINT gridZ, 
     const void *pParams, UINT paramSize, 
     const NVDX_ObjectHandle__* *pReadResources, UINT numReadResources,
@@ -5224,20 +5427,29 @@ void WrappedID3D11DeviceContext::LaunchCubinShader(
 
   m_EmptyCommandList = false;
 
-  //SERIALISE_TIME_CALL(
-  //    m_pRealContext->Dispatch(ThreadGroupCountX, ThreadGroupCountY, ThreadGroupCountZ));
+  WrappedCubinShader *cubinShader = (WrappedCubinShader *)hShader;
+  RDCASSERT(cubinShader->GetParamBufferSize() == paramSize);
 
   if(IsActiveCapturing(m_State))
   {
+    MarkResourceReferenced(GetIDForNVDXObjectHandle(hShader), eFrameRef_Read);
+    for(UINT rid = 0; rid < numReadResources; rid++)
+    {
+      MarkResourceReferenced(GetIDForNVDXObjectHandle(pReadResources[rid]), eFrameRef_Read);
+    }
+    for(UINT wid = 0; wid < numWriteResources; wid++)
+    {
+      MarkResourceReferenced(GetIDForNVDXObjectHandle(pWriteResources[wid]), eFrameRef_PartialWrite);
+    }
+
     USE_SCRATCH_SERIALISER();
     GET_SERIALISER.SetActionChunk();
     SCOPED_SERIALISE_CHUNK(D3D11Chunk::NvApi_LaunchCubinShader);
     SERIALISE_ELEMENT(m_ResourceID).Named("Context"_lit).TypedAs("ID3D11DeviceContext *"_lit);
-    Serialise_LaunchCubinShader(GET_SERIALISER, hShader, gridX, gridY, gridZ, pParams, paramSize,
+    Serialise_DispatchCUDA(GET_SERIALISER, hShader, gridX, gridY, gridZ, pParams, paramSize,
                                 pReadResources, numReadResources, pWriteResources, numWriteResources);
 
     m_ContextRecord->AddChunk(scope.Get());
-    MarkResourceReferenced(GetIDForNVDXObjectHandle(hShader), eFrameRef_Read);
   }
 }
 

@@ -295,7 +295,7 @@ static void MakeResourceList(bool srv, DXBC::DXBCContainer *dxbc,
     refl[i] = res;
   }
 }
-
+#pragma optimize("",off)
 void MakeShaderReflection(DXBC::DXBCContainer *dxbc, const ShaderEntryPoint &entry,
                           ShaderReflection *refl)
 {
@@ -504,3 +504,5 @@ void MakeShaderReflection(DXBC::DXBCContainer *dxbc, const ShaderEntryPoint &ent
         MakeConstantBufferVariable(false, RayAttributes.members[v]));
   }
 }
+
+#pragma optimize("", on)

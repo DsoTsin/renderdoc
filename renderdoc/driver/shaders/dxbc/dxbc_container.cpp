@@ -39,6 +39,112 @@
 
 #include "driver/dx/official/d3dcompiler.h"
 
+namespace Fatbin
+{
+Program::Program(const byte *bytes, size_t length)
+{
+  m_FatBin = fatbin_load(bytes, length);
+  if(m_FatBin)
+  {
+    size_t ptx_size = fatbin_get_ptx_size(m_FatBin);
+    m_PTX.assign((const char *)fatbin_get_ptx_data(m_FatBin), ptx_size);
+
+    auto reflection = fatbin_create_reflection_container(m_FatBin);
+    if(reflection)
+    {
+      auto param_count = fatbin_reflection_container_get_param_count(reflection);
+      m_Params.reserve(param_count);
+      fatbin_reflection_container_iterate_params(reflection, &Program::OnIterParam, this);
+      std::sort(m_Params.begin(), m_Params.end(), [](const ParamDesc &a, const ParamDesc &b) {
+        return a.param_index < b.param_index;
+      });
+      auto binding_count = fatbin_reflection_container_get_resource_count(reflection);
+      m_Bindings.reserve(binding_count);
+      fatbin_reflection_container_iterate_bindings(reflection, &Program::OnIterBinding, this);
+      std::sort(m_Bindings.begin(), m_Bindings.end(), [](const BindingDesc &a, const BindingDesc &b) {
+        return a.param_index < b.param_index;
+      });
+      AdjustBindings();
+      fatbin_free_reflection_container(reflection);
+    }
+  }
+}
+Program::~Program()
+{
+  if(m_FatBin)
+  {
+    fatbin_free(m_FatBin);
+    m_FatBin = nullptr;
+  }
+}
+void Program::OnGatherParam(rdcstr pname, int64_t offset, uint32_t param_index, size_t param_size,
+                            size_t param_alignment)
+{
+  m_Params.push_back({std::move(pname), offset, param_index, param_size, param_alignment});
+  m_ParamBufferSize += param_size;
+}
+void Program::OnGatherBinding(rdcstr pname, ptx_resource_type ty, int64_t offset, uint32_t param_index)
+{
+  m_Bindings.push_back({std::move(pname), ty, offset, param_index});
+}
+void Program::AdjustBindings()
+{
+  size_t Offset = 0;
+  for(auto &Param : m_Params)
+  {
+    Param.param_byte_offset = Offset;
+    Offset += Param.size;
+  }
+  for(auto &Binding : m_Bindings)
+  {
+    Binding.param_byte_offset =
+        m_Params[Binding.param_index].param_byte_offset + Binding.param_byte_offset;
+  }
+}
+void Program::FetchReflection(DXBC::Reflection *reflection)
+{
+  for(auto &Binding : m_Bindings)
+  {
+    switch(Binding.type)
+    {
+      case ptx_resource_type::ptx_resource_type_buffer:
+      {
+        DXBC::ShaderInputBind bind;
+        bind.bindCount = 1;
+        bind.type = DXBC::ShaderInputBind::TYPE_BYTEADDRESS;
+        bind.name = Binding.param_name;
+        bind.reg = (uint32_t)Binding.param_byte_offset;
+        bind.dimension = DXBC::ShaderInputBind::DIM_BUFFER;
+      }
+          break;
+      case ptx_resource_type::ptx_resource_type_texture: 
+      {
+        DXBC::ShaderInputBind bind;
+        bind.name = Binding.param_name;
+        bind.type = DXBC::ShaderInputBind::TYPE_TEXTURE;
+        bind.bindCount = 1;
+        bind.numComps = 4;
+        bind.reg = (uint32_t)Binding.param_byte_offset;
+        bind.dimension = DXBC::ShaderInputBind::DIM_TEXTURE2D;
+      }
+          break;
+      case ptx_resource_type::ptx_resource_type_surface: 
+      {
+        DXBC::ShaderInputBind bind;
+        bind.name = Binding.param_name;
+        bind.type = DXBC::ShaderInputBind::TYPE_TEXTURE;
+        bind.bindCount = 1;
+        bind.numComps = 4;
+        bind.reg = (uint32_t)Binding.param_byte_offset;
+        bind.dimension = DXBC::ShaderInputBind::DIM_TEXTURE2D;
+        reflection->UAVs.push_back(bind);
+      }
+          break;
+    }
+  }
+}
+}
+
 // this is extern so that it can be shared with vulkan
 RDOC_EXTERN_CONFIG(rdcarray<rdcstr>, DXBC_Debug_SearchDirPaths);
 RDOC_EXTERN_CONFIG(rdcarray<rdcstr>, Replay_Shader_LimitedSearchDirPaths);
@@ -1646,8 +1752,14 @@ DXBCContainer::DXBCContainer(const bytebuf &ByteCode, const rdcstr &debugInfoPat
   FileHeader *header = (FileHeader *)data;
   FileHeader *debugHeader = (FileHeader *)debugData;
 
-  if(header->fourcc != FOURCC_DXBC)
+  if (header->fourcc != FOURCC_DXBC)
+  {
+    if(header->fourcc == FOURCC_FATBIN)
+    {
+      ParseFATBin();
+    }
     return;
+  }
 
   if(header->fileLength != (uint32_t)m_ShaderBlob.size())
     return;
@@ -2830,6 +2942,15 @@ void DXBCContainer::ProcessSourceInfo(const byte *chunkContents, uint32_t chunkS
       default: RDCERR("Unexpected SRCI section type %u", section->type); break;
     }
   }
+}
+
+void DXBCContainer::ParseFATBin()
+{
+  m_FatbinCode = new Fatbin::Program(m_ShaderBlob.data(), m_ShaderBlob.size());
+  m_Disassembly = m_FatbinCode->GetAssembleCode();
+  m_Reflection = new DXBC::Reflection;
+  m_FatbinCode->FetchReflection(m_Reflection);
+  m_Type = DXBC::ShaderType::Compute;
 }
 
 struct DxcArg

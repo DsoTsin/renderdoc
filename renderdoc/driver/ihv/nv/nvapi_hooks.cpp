@@ -202,6 +202,24 @@ private:
   HOOK_NVAPI(NvAPI_D3D12_SetNvShaderExtnSlotSpaceLocalThread, 0x43d867c0); \
   HOOK_NVAPI(NvAPI_D3D12_CreateGraphicsPipelineState, 0x2fc28856);         \
   HOOK_NVAPI(NvAPI_D3D12_CreateComputePipelineState, 0x2762deac);          \
+  HOOK_NVAPI(NvAPI_D3D12_GetCudaSurfaceObject, 0x48f5b2ee);                \
+  HOOK_NVAPI(NvAPI_D3D12_GetCudaTextureObject, 0x80403fc9);                \
+  WHITELIST_NVAPI(NvAPI_D3D12_GetCudaMergedTextureSamplerObject, 0x329fe6e0);\
+  WHITELIST_NVAPI(NvAPI_D3D12_GetCudaIndependentDescriptorObject, 0x0ddac234);\
+  WHITELIST_NVAPI(NvAPI_D3D12_CaptureUAVInfo, 0x6e5ea9db);                 \
+  WHITELIST_NVAPI(NvAPI_D3D12_GetGraphicsCapabilities, 0x01e87354);        \
+  WHITELIST_NVAPI(NvAPI_NGX_SetNGXOverrideState, 0xb60fcb4e);              \
+  WHITELIST_NVAPI(NvAPI_GPU_GetValuesFromInstalledINF, 0x0F2400AB);        \
+  WHITELIST_NVAPI(NvAPI_DRS_LoadGoldSettings, 0xa782ea46);                 \
+  HOOK_NVAPI(NvAPI_D3D12_NotifyOutOfBandCommandQueue, 0x03d6e8cb);         \
+  HOOK_NVAPI(NvAPI_D3D12_CreateCubinComputeShaderWithName, 0x1dc7261f);    \
+  HOOK_NVAPI(NvAPI_D3D12_CreateCubinComputeShaderEx, 0x3151211b);          \
+  HOOK_NVAPI(NvAPI_D3D12_CreateCubinComputeShader, 0x2a2c79e8);            \
+  HOOK_NVAPI(NvAPI_D3D12_CreateCubinComputeShaderExV2, 0x299f5fdc);        \
+  HOOK_NVAPI(NvAPI_D3D12_LaunchCubinShader, 0x5c52bb86);                   \
+  HOOK_NVAPI(NvAPI_D3D12_DestroyCubinComputeShader, 0x7fb785ba);           \
+  HOOK_NVAPI(NvAPI_D3D1x_GetGraphicsCapabilities, 0x52b1499a);             \
+  HOOK_NVAPI(NvAPI_D3D_SetReflexSync, 0xb9f6faff);                         \
   WHITELIST_NVAPI(NvAPI_SYS_GetDriverAndBranchVersion, 0x2926aaad);        \
   WHITELIST_NVAPI(NvAPI_Unload, 0xd22bdd7e);                               \
   WHITELIST_NVAPI(NvAPI_GetErrorMessage, 0x6c2d048c);                      \
@@ -210,6 +228,10 @@ private:
   WHITELIST_NVAPI(NvAPI_DRS_FindApplicationByName, 0xeee566b2);            \
   WHITELIST_NVAPI(NvAPI_DRS_CreateSession, 0x0694d52e);                    \
   WHITELIST_NVAPI(NvAPI_DRS_GetProfileInfo, 0x61cd6fd6);                   \
+  WHITELIST_NVAPI(NvAPI_DRS_LoadSettings, 0x375dbd6b);                     \
+  WHITELIST_NVAPI(NvAPI_DRS_GetBaseProfile, 0xda8466a0);                   \
+  WHITELIST_NVAPI(NvAPI_DRS_GetSetting, 0x73bf8338);                       \
+  WHITELIST_NVAPI(NvAPI_GPU_GetPCIIdentifiers, 0x2ddfb66e);                \
   WHITELIST_NVAPI(NvAPI_DRS_DestroySession, 0xdad9cff8);                   \
   WHITELIST_NVAPI(NvAPI_D3D11_SetDepthBoundsTest, 0x7aaf7a04);             \
   WHITELIST_NVAPI(NvAPI_GPU_GetAdapterIdFromPhysicalGpu, 0x0ff07fde);      \
@@ -217,28 +239,17 @@ private:
   WHITELIST_NVAPI(NvAPI_GPU_GetLogicalGpuInfo, 0x842b066e);                \
   WHITELIST_NVAPI(NvAPI_D3D11_IsFatbinPTXSupported, 0x6086bd93);           \
   WHITELIST_NVAPI(NvAPI_D3D12_IsFatbinPTXSupported, 0x70c07832);             \
-  WHITELIST_NVAPI(NvAPI_D3D12_GetCudaSurfaceObject, 0x48f5b2ee);             \
-  WHITELIST_NVAPI(NvAPI_D3D12_GetCudaTextureObject, 0x80403fc9);             \
-  WHITELIST_NVAPI(NvAPI_D3D12_NotifyOutOfBandCommandQueue, 0x03d6e8cb);      \
-  WHITELIST_NVAPI(NvAPI_D3D12_CreateCubinComputeShaderWithName, 0x1dc7261f); \
-  WHITELIST_NVAPI(NvAPI_D3D12_CreateCubinComputeShaderEx, 0x3151211b);       \
-  WHITELIST_NVAPI(NvAPI_D3D12_CreateCubinComputeShader, 0x2a2c79e8);         \
-  WHITELIST_NVAPI(NvAPI_D3D12_CreateCubinComputeShaderExV2, 0x299f5fdc);     \
-  WHITELIST_NVAPI(NvAPI_D3D12_LaunchCubinShader, 0x5c52bb86);                \
-  WHITELIST_NVAPI(NvAPI_D3D12_DestroyCubinComputeShader, 0x7fb785ba);        \
   WHITELIST_NVAPI(NvAPI_D3D12_CreateCuModule, 0xad1a677d);                   \
   WHITELIST_NVAPI(NvAPI_D3D12_EnumFunctionsInModule, 0x7ab88d88);            \
   WHITELIST_NVAPI(NvAPI_D3D12_CreateCuFunction, 0xe2436e22);                 \
   WHITELIST_NVAPI(NvAPI_D3D12_LaunchCuKernelChain, 0x24973538);              \
   WHITELIST_NVAPI(NvAPI_D3D12_LaunchCuKernelChainEx, 0x846a9bf0);            \
-  WHITELIST_NVAPI(NvAPI_D3D1x_GetGraphicsCapabilities, 0x52b1499a);          \
-  WHITELIST_NVAPI(NvAPI_D3D_SetReflexSync, 0xb9f6faff);                      \
-  WHITELIST_NVAPI(NvAPI_D3D_GetLatency, 0x1a587f9c);                         \
   WHITELIST_NVAPI(NvAPI_D3D_SetLatencyMarker, 0xd9984c05);                   \
   WHITELIST_NVAPI(NvAPI_D3D12_SetAsyncFrameMarker, 0x13c98f73);              \
   WHITELIST_NVAPI(NvAPI_D3D_SetSleepMode, 0xac1ca9e0);                       \
   WHITELIST_NVAPI(NvAPI_D3D_GetSleepStatus, 0xaef96ca1);                     \
   WHITELIST_NVAPI(NvAPI_D3D_Sleep, 0x852cd1d2);                              \
+  WHITELIST_NVAPI(NvAPI_D3D_GetLatency, 0x1a587f9c);                         \
   WHITELIST_NVAPI(NvAPI_EnumPhysicalGPUs, 0xe5ac921f);                       \
   WHITELIST_NVAPI(NvAPI_GetInterfaceVersionString, 0x01053fa5);
 
@@ -384,6 +395,250 @@ private:
 
       nvapiDev->SetShaderExtUAV(uavSpace, uavSlot, FALSE);
 
+      return ret;
+    }
+    else
+    {
+      RDCERR("Didn't pass RenderDoc-wrapped device to nvapi function");
+      return NVAPI_INVALID_POINTER;
+    }
+  }
+
+  static NvAPI_Status NvAPI_D3D12_GetCudaTextureObject_hook(ID3D12Device* pDevice,
+      D3D12_CPU_DESCRIPTOR_HANDLE texDesc,
+      D3D12_CPU_DESCRIPTOR_HANDLE smpDesc,
+      NvU32* pTextureHandle)
+  {
+    INVAPID3DDevice *nvapiDev = NULL;
+    HRESULT hr = pDevice->QueryInterface(__uuidof(INVAPID3DDevice), (void **)&nvapiDev);
+    // this will only succeed if it's our own wrapped device. It doesn't change the refcount, this
+    // is a COM-breaking backdoor
+    if(SUCCEEDED(hr))
+    {
+      NvAPI_Status ret =
+          nvhooks.NvAPI_D3D12_GetCudaTextureObject()(pDevice, texDesc, smpDesc, pTextureHandle);
+      return ret;
+    }
+    else
+    {
+      RDCERR("Didn't pass RenderDoc-wrapped device to nvapi function");
+      return NVAPI_INVALID_POINTER;
+    }
+  }
+
+  static NvAPI_Status NvAPI_D3D12_GetCudaSurfaceObject_hook(ID3D12Device *pDevice,
+                                                       D3D12_CPU_DESCRIPTOR_HANDLE uavDesc,
+                                                       NvU32 *pSurfaceHandle)
+  {
+    INVAPID3DDevice *nvapiDev = NULL;
+    HRESULT hr = pDevice->QueryInterface(__uuidof(INVAPID3DDevice), (void **)&nvapiDev);
+    // this will only succeed if it's our own wrapped device. It doesn't change the refcount, this
+    // is a COM-breaking backdoor
+    if(SUCCEEDED(hr))
+    {
+      NvAPI_Status ret = nvhooks.NvAPI_D3D12_GetCudaSurfaceObject()(pDevice, uavDesc, pSurfaceHandle);
+      return ret;
+    }
+    else
+    {
+      RDCERR("Didn't pass RenderDoc-wrapped device to nvapi function");
+      return NVAPI_INVALID_POINTER;
+    }
+  }
+
+  static NvAPI_Status NvAPI_D3D12_NotifyOutOfBandCommandQueue_hook(ID3D12CommandQueue* pCommandQueue,
+      NV_OUT_OF_BAND_CQ_TYPE cqType)
+  {
+    INVAPID3DDevice *nvapiDev = NULL;
+    Microsoft::WRL::ComPtr<ID3D12Device> pDevice;
+    pCommandQueue->GetDevice(__uuidof(ID3D12Device), (void**)pDevice.GetAddressOf());
+    HRESULT hr = pDevice->QueryInterface(__uuidof(INVAPID3DDevice), (void **)&nvapiDev);
+    // this will only succeed if it's our own wrapped device. It doesn't change the refcount, this
+    // is a COM-breaking backdoor
+    if(SUCCEEDED(hr))
+    {
+      NvAPI_Status ret = nvhooks.NvAPI_D3D12_NotifyOutOfBandCommandQueue()(pCommandQueue, cqType);
+      return ret;
+    }
+    else
+    {
+      RDCERR("Didn't pass RenderDoc-wrapped device to nvapi function");
+      return NVAPI_INVALID_POINTER;
+    }
+  }
+
+  static NvAPI_Status NvAPI_D3D12_CreateCubinComputeShaderWithName_hook(
+      ID3D12Device* pDevice, const void* pCubin, NvU32 size, NvU32 blockX,
+      NvU32 blockY, NvU32 blockZ, const char* pShaderName,
+      NVDX_ObjectHandle* phShader)
+  {
+    if(!pDevice)
+    {
+      //RDCERR("Didn't pass RenderDoc-wrapped device to nvapi function");
+      return NVAPI_INVALID_ARGUMENT;
+    }
+    INVAPID3DDevice *nvapiDev = NULL;
+    HRESULT hr = pDevice->QueryInterface(__uuidof(INVAPID3DDevice), (void **)&nvapiDev);
+    // this will only succeed if it's our own wrapped device. It doesn't change the refcount, this
+    // is a COM-breaking backdoor
+    if(SUCCEEDED(hr))
+    {
+      NvAPI_Status ret = nvhooks.NvAPI_D3D12_CreateCubinComputeShaderWithName()(
+          pDevice, pCubin, size, blockX, blockY, blockZ, pShaderName, phShader);
+      return ret;
+    }
+    else
+    {
+      RDCERR("Didn't pass RenderDoc-wrapped device to nvapi function");
+      return NVAPI_INVALID_POINTER;
+    }
+  }
+
+  static NvAPI_Status NvAPI_D3D12_CreateCubinComputeShaderExV2_hook(
+      NVAPI_D3D12_CREATE_CUBIN_SHADER_PARAMS *pParams)
+  {
+    if(!pParams)
+    {
+      //RDCERR("Didn't pass RenderDoc-wrapped device to nvapi function");
+      return NVAPI_INVALID_ARGUMENT;
+    }
+    INVAPID3DDevice *nvapiDev = NULL;
+    HRESULT hr = pParams->pDevice->QueryInterface(__uuidof(INVAPID3DDevice), (void **)&nvapiDev);
+    // this will only succeed if it's our own wrapped device. It doesn't change the refcount, this
+    // is a COM-breaking backdoor
+    if(SUCCEEDED(hr))
+    {
+      NvAPI_Status ret = nvhooks.NvAPI_D3D12_CreateCubinComputeShaderExV2()(pParams);
+      return ret;
+    }
+    else
+    {
+      RDCERR("Didn't pass RenderDoc-wrapped device to nvapi function");
+      return NVAPI_INVALID_POINTER;
+    }
+  }
+  
+  static NvAPI_Status NvAPI_D3D12_CreateCubinComputeShaderEx_hook(ID3D12Device* pDevice,
+      const void* pCubin, NvU32 size,
+      NvU32 blockX, __in NvU32 blockY, NvU32 blockZ, NvU32 dynSharedMemBytes,
+      const char* pShaderName, NVDX_ObjectHandle* phShader)
+  {
+    if(!pDevice)
+    {
+      //RDCERR("Didn't pass RenderDoc-wrapped device to nvapi function");
+      return NVAPI_INVALID_ARGUMENT;
+    }
+    INVAPID3DDevice *nvapiDev = NULL;
+    HRESULT hr = pDevice->QueryInterface(__uuidof(INVAPID3DDevice), (void **)&nvapiDev);
+    // this will only succeed if it's our own wrapped device. It doesn't change the refcount, this
+    // is a COM-breaking backdoor
+    if(SUCCEEDED(hr))
+    {
+      NvAPI_Status ret = nvhooks.NvAPI_D3D12_CreateCubinComputeShaderEx()(
+          pDevice, pCubin, size, blockX, blockY, blockZ, dynSharedMemBytes, pShaderName, phShader);
+      return ret;
+    }
+    else
+    {
+      RDCERR("Didn't pass RenderDoc-wrapped device to nvapi function");
+      return NVAPI_INVALID_POINTER;
+    }
+  }
+
+  static NvAPI_Status NvAPI_D3D12_CreateCubinComputeShader_hook(ID3D12Device* pDevice,
+      const void* pCubin, NvU32 size,
+      NvU32 blockX, NvU32 blockY, NvU32 blockZ,
+      NVDX_ObjectHandle* phShader)
+  {
+    if(!pDevice)
+    {
+      //RDCERR("Didn't pass RenderDoc-wrapped device to nvapi function");
+      return NVAPI_INVALID_ARGUMENT;
+    }
+    INVAPID3DDevice *nvapiDev = NULL;
+    HRESULT hr = pDevice->QueryInterface(__uuidof(INVAPID3DDevice), (void **)&nvapiDev);
+    // this will only succeed if it's our own wrapped device. It doesn't change the refcount, this
+    // is a COM-breaking backdoor
+    if(SUCCEEDED(hr))
+    {
+      NvAPI_Status ret = nvhooks.NvAPI_D3D12_CreateCubinComputeShader()(pDevice, pCubin, size, blockX, blockY, blockZ, phShader);
+      return ret;
+    }
+    else
+    {
+      RDCERR("Didn't pass RenderDoc-wrapped device to nvapi function");
+      return NVAPI_INVALID_POINTER;
+    }
+  }
+
+  static NvAPI_Status NvAPI_D3D12_DestroyCubinComputeShader_hook(ID3D12Device* pDevice, NVDX_ObjectHandle hShader)
+  {
+    INVAPID3DDevice *nvapiDev = NULL;
+    HRESULT hr = pDevice->QueryInterface(__uuidof(INVAPID3DDevice), (void **)&nvapiDev);
+    // this will only succeed if it's our own wrapped device. It doesn't change the refcount, this
+    // is a COM-breaking backdoor
+    if(SUCCEEDED(hr))
+    {
+      NvAPI_Status ret = nvhooks.NvAPI_D3D12_DestroyCubinComputeShader()(pDevice, hShader);
+      return ret;
+    }
+    else
+    {
+      RDCERR("Didn't pass RenderDoc-wrapped device to nvapi function");
+      return NVAPI_INVALID_POINTER;
+    }
+  }
+
+  static NvAPI_Status NvAPI_D3D12_LaunchCubinShader_hook(
+      ID3D12GraphicsCommandList* pCommandList, NVDX_ObjectHandle hShader,
+      NvU32 gridX, NvU32 gridY, NvU32 gridZ,
+      const void* pParams, NvU32 paramSize)
+  {
+    Microsoft::WRL::ComPtr<ID3D12Device> pDevice;
+    pCommandList->GetDevice(__uuidof(ID3D12Device), (void **)pDevice.GetAddressOf());
+    INVAPID3DDevice *nvapiDev = NULL;
+    HRESULT hr = pDevice->QueryInterface(__uuidof(INVAPID3DDevice), (void **)&nvapiDev);
+    if(SUCCEEDED(hr))
+    {
+      NvAPI_Status ret = nvhooks.NvAPI_D3D12_LaunchCubinShader()(pCommandList, hShader, gridX, gridY, gridZ, pParams, paramSize);
+      return ret;
+    }
+    else
+    {
+      RDCERR("Didn't pass RenderDoc-wrapped device to nvapi function");
+      return NVAPI_INVALID_POINTER;
+    }
+  }
+
+  static NvAPI_Status NvAPI_D3D1x_GetGraphicsCapabilities_hook(__in IUnknown* pDevice,
+      NvU32 structVersion,
+      NV_D3D1x_GRAPHICS_CAPS* pGraphicsCaps)
+  {
+    if(!pDevice)
+    {
+      return NVAPI_INVALID_ARGUMENT;
+    }
+    INVAPID3DDevice *nvapiDev = NULL;
+    HRESULT hr = pDevice->QueryInterface(__uuidof(INVAPID3DDevice), (void **)&nvapiDev);
+    if(SUCCEEDED(hr))
+    {
+      NvAPI_Status ret = nvhooks.NvAPI_D3D1x_GetGraphicsCapabilities()(pDevice, structVersion, pGraphicsCaps);
+      return ret;
+    }
+    else
+    {
+      RDCERR("Didn't pass RenderDoc-wrapped device to nvapi function");
+      return NVAPI_INVALID_POINTER;
+    }
+  }
+
+  static NvAPI_Status NvAPI_D3D_SetReflexSync_hook(IUnknown* pDev, NV_SET_REFLEX_SYNC_PARAMS* pSetReflexSyncParams)
+  {
+    INVAPID3DDevice *nvapiDev = NULL;
+    HRESULT hr = pDev->QueryInterface(__uuidof(INVAPID3DDevice), (void **)&nvapiDev);
+    if(SUCCEEDED(hr))
+    {
+      NvAPI_Status ret = nvhooks.NvAPI_D3D_SetReflexSync()(pDev, pSetReflexSyncParams);
       return ret;
     }
     else

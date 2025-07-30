@@ -34,6 +34,8 @@
 #include "driver/dx/official/d3dcommon.h"
 #include "dxbc_common.h"
 
+#include "dlssparser/ptx_reflect.h"
+
 namespace DXBC
 {
 class IDebugInfo;
@@ -51,6 +53,59 @@ namespace DXIL
 struct PSVData;
 struct RDATData;
 };
+
+namespace Fatbin
+{
+struct BindingDesc
+{
+  rdcstr param_name;
+  ptx_resource_type type;
+  int64_t param_byte_offset;
+  uint32_t param_index;
+};
+
+struct ParamDesc
+{
+  rdcstr param_name;
+  int64_t param_byte_offset;
+  uint32_t param_index;
+  size_t size;
+  size_t align;
+};
+struct Program
+{
+  Program(const byte *bytes, size_t length);
+  ~Program();
+
+  const rdcstr &GetAssembleCode() const { return m_PTX; }
+  void FetchReflection(DXBC::Reflection *reflection);
+private:
+  void *m_FatBin;
+  rdcstr m_PTX;
+  rdcarray<ParamDesc> m_Params;
+  size_t m_ParamBufferSize;
+  rdcarray<BindingDesc> m_Bindings;
+
+  static void OnIterParam(const int8_t *pname, size_t pnamelen, int64_t offset,
+                          uint32_t param_index, size_t param_size, size_t param_alignment, void *p)
+  {
+    Program *shader = (Program *)p;
+    rdcstr param((const char *)pname, pnamelen);
+    shader->OnGatherParam(std::move(param), offset, param_index, param_size, param_alignment);
+  }
+  void OnGatherParam(rdcstr pname, int64_t offset, uint32_t param_index, size_t param_size,
+                     size_t param_alignment);
+  static void OnIterBinding(const int8_t *pname, size_t pnamelen, ptx_resource_type ty,
+                            int64_t offset, uint32_t param_index, void *p)
+  {
+    Program *shader = (Program *)p;
+    rdcstr param((const char *)pname, pnamelen);
+    shader->OnGatherBinding(std::move(param), ty, offset, param_index);
+  }
+  void OnGatherBinding(rdcstr pname, ptx_resource_type ty, int64_t offset, uint32_t param_index);
+  void AdjustBindings();
+};
+}
 
 // many thanks to winehq for information of format of RDEF, STAT and SIGN chunks:
 // http://source.winehq.org/git/wine.git/blob/HEAD:/dlls/d3dcompiler_43/reflection.c
@@ -177,6 +232,7 @@ static const uint32_t FOURCC_RTS0 = MAKE_FOURCC('R', 'T', 'S', '0');
 static const uint32_t FOURCC_RDAT = MAKE_FOURCC('R', 'D', 'A', 'T');
 static const uint32_t FOURCC_VERS = MAKE_FOURCC('V', 'E', 'R', 'S');
 static const uint32_t FOURCC_SRCI = MAKE_FOURCC('S', 'R', 'C', 'I');
+static const uint32_t FOURCC_FATBIN = 0xBA55ED50;
 
 struct RDEFHeader;
 
@@ -280,6 +336,8 @@ private:
   void TryFetchSeparateDebugInfo(bytebuf &byteCode, const rdcstr &debugInfoPath);
   void ProcessSourceInfo(const byte *chunkContents, uint32_t size);
 
+  void ParseFATBin();
+
   bytebuf m_DebugShaderBlob;
   bytebuf m_ShaderBlob;
 
@@ -312,6 +370,7 @@ private:
   ShaderStatistics m_ShaderStats;
   DXBCBytecode::Program *m_DXBCByteCode = NULL;
   DXIL::Program *m_DXILByteCode = NULL;
+  Fatbin::Program *m_FatbinCode = NULL;
   IDebugInfo *m_DebugInfo = NULL;
   Reflection *m_Reflection = NULL;
   rdcarray<ShaderEntryPoint> m_EntryPoints;

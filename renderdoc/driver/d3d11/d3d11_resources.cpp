@@ -781,7 +781,7 @@ WrappedCubinShader::WrappedCubinShader(NVDX_ObjectHandle__ *real, ResourceId ori
 
       //RDCASSERT(WrappedShader::m_ShaderList.find(m_ID) == WrappedShader::m_ShaderList.end());
       WrappedShader::m_ShaderList[m_ID] = new WrappedShader::ShaderEntry(
-          device, origId != ResourceId() ? origId : m_ID, (const byte*)m_PtxCode.data(), m_PtxCode.size());
+          device, origId != ResourceId() ? origId : m_ID, (const byte *)code, codeLen);
 
     }
     m_ReflectionContainer = fatbin_create_reflection_container(m_FatbinLoader);
